@@ -15,6 +15,7 @@
     <div class="win-bar">
       <span class="win-title">★ P0M0D0R0.EXE</span>
       <div class="win-btns">
+        <button class="wbtn" onclick="togglePiP()" title="Mini Player">◱</button>
         <div class="wbtn">_</div>
         <div class="wbtn">□</div>
         <div class="wbtn">×</div>
@@ -55,6 +56,9 @@
         <button class="btn" onclick="handleSkip()">SKIP</button>
       </div>
     </div>
+
+    <canvas id="timerCanvas" width="200" height="200" style="display:none;"></canvas>
+    <video id="pipVideo" width="200" height="200" style="display:none;"></video>
 
     <div class="custom-section">
       <div class="custom-title">✦ CUSTOMIZE TIMES (MIN)</div>

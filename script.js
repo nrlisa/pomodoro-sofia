@@ -246,6 +246,70 @@ function renderTodos() {
   stats.textContent = done + '/' + todos.length + ' DONE ★';
 }
 
+function drawTimerOnCanvas() {
+  const canvas = document.getElementById('timerCanvas');
+  const ctx = canvas.getContext('2d');
+  const size = 200;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = 80;
+
+  ctx.fillStyle = '#fdf0f8';
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.strokeStyle = '#f0ddf0';
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const progress = secsLeft / totalSecs;
+  ctx.strokeStyle = mode === 'focus' ? '#f0a0c8' : (mode === 'short' ? '#a0c0f8' : '#c0a0f8');
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+  ctx.stroke();
+
+  ctx.fillStyle = '#d060a0';
+  ctx.font = 'bold 52px VT323';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const m = String(Math.floor(secsLeft / 60)).padStart(2, '0');
+  const s = String(secsLeft % 60).padStart(2, '0');
+  ctx.fillText(m + ':' + s, cx, cy - 10);
+
+  ctx.fillStyle = '#9a7ab8';
+  ctx.font = '12px VT323';
+  ctx.fillText(modeLabels[mode], cx, cy + 25);
+}
+
+async function togglePiP() {
+  const video = document.getElementById('pipVideo');
+  const canvas = document.getElementById('timerCanvas');
+  try {
+    if (video !== document.pictureInPictureElement) {
+      drawTimerOnCanvas();
+      const stream = canvas.captureStream(30);
+      video.srcObject = stream;
+      video.play();
+      await video.requestPictureInPicture();
+      const updateInterval = setInterval(() => {
+        if (video !== document.pictureInPictureElement) {
+          clearInterval(updateInterval);
+          stream.getTracks().forEach(t => t.stop());
+        } else {
+          drawTimerOnCanvas();
+        }
+      }, 100);
+    } else {
+      await document.exitPictureInPicture();
+    }
+  } catch (error) {
+    console.error('PiP Error:', error);
+    document.getElementById('statusTxt').textContent = 'PiP FAILED: ' + error.message;
+  }
+}
+
 window.addEventListener('load', () => {
   document.getElementById('inp-focus').value = CFG.focus;
   document.getElementById('inp-short').value = CFG.short;

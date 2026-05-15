@@ -315,8 +315,17 @@ async function togglePiP() {
       drawTimerOnCanvas();
       const stream = canvas.captureStream(30);
       video.srcObject = stream;
-      video.play();
+      video.muted = true;
+
+      const playPromise = video.play();
+      if (video.readyState < 1) {
+        await new Promise(resolve => {
+          video.addEventListener('loadedmetadata', resolve, { once: true });
+        });
+      }
+      await playPromise;
       await video.requestPictureInPicture();
+
       const updateInterval = setInterval(() => {
         if (video !== document.pictureInPictureElement) {
           clearInterval(updateInterval);

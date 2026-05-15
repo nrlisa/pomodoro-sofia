@@ -6,6 +6,7 @@ let totalSecs = CFG.focus * 60;
 let secsLeft = totalSecs;
 let running = false;
 let iv = null;
+let timerEnd = null;
 let sessions = parseInt(localStorage.getItem('pomo_sessions')) || 0;
 let alarmIv = null;
 let alarmNodes = [];
@@ -76,7 +77,7 @@ const modeLabels = { focus: 'FOCUS TIME', short: 'SHORT BREAK', long: 'LONG BREA
 
 function setMode(m, autoStart) {
   if (running && !autoStart) return;
-  clearInterval(iv); running = false;
+  clearInterval(iv); iv = null; timerEnd = null; running = false;
   mode = m;
   totalSecs = CFG[m] * 60;
   secsLeft = totalSecs;
@@ -119,24 +120,44 @@ function updateRing() {
   document.getElementById('ring').style.strokeDashoffset = CIRC * (1 - secsLeft / totalSecs);
 }
 
+function tickTimer() {
+  const remainingMs = timerEnd - Date.now();
+  if (remainingMs <= 0) {
+    secsLeft = 0;
+    updateDisp(); updateRing();
+    clearInterval(iv);
+    iv = null;
+    running = false;
+    document.getElementById('startBtn').textContent = 'START';
+    onEnd();
+    return;
+  }
+
+  const newSecsLeft = Math.ceil(remainingMs / 1000);
+  if (newSecsLeft !== secsLeft) {
+    secsLeft = newSecsLeft;
+    updateDisp(); updateRing();
+  }
+}
+
 function startTimer() {
   running = true;
+  if (!timerEnd) {
+    timerEnd = Date.now() + secsLeft * 1000;
+  }
   document.getElementById('startBtn').textContent = 'PAUSE';
   document.getElementById('statusTxt').textContent = 'RUNNING...';
-  iv = setInterval(() => {
-    if (secsLeft <= 0) {
-      clearInterval(iv); running = false;
-      document.getElementById('startBtn').textContent = 'START';
-      onEnd(); return;
-    }
-    secsLeft--; updateDisp(); updateRing();
-  }, 1000);
+  tickTimer();
+  iv = setInterval(tickTimer, 250);
 }
 
 function handleStart() {
   ensureAudio();
   if (running) {
-    clearInterval(iv); running = false;
+    clearInterval(iv);
+    iv = null;
+    timerEnd = null;
+    running = false;
     document.getElementById('startBtn').textContent = 'START';
     document.getElementById('statusTxt').textContent = 'PAUSED';
   } else {
@@ -145,6 +166,7 @@ function handleStart() {
 }
 
 function onEnd() {
+  timerEnd = null;
   if (mode === 'focus') {
     sessions = Math.min(sessions + 1, 4);
     localStorage.setItem('pomo_sessions', sessions);
@@ -168,7 +190,8 @@ function stopAlarmAndNext() {
 
 function handleReset() {
   ensureAudio();
-  clearInterval(iv); stopSound(); running = false;
+  clearInterval(iv); iv = null; timerEnd = null;
+  stopSound(); running = false;
   document.getElementById('startBtn').textContent = 'START';
   document.getElementById('alarmBar').classList.remove('on');
   pendingNextMode = null;
@@ -178,7 +201,8 @@ function handleReset() {
 
 function handleSkip() {
   ensureAudio();
-  clearInterval(iv); stopSound(); running = false;
+  clearInterval(iv); iv = null; timerEnd = null;
+  stopSound(); running = false;
   document.getElementById('startBtn').textContent = 'START';
   document.getElementById('alarmBar').classList.remove('on');
   if (mode === 'focus') {

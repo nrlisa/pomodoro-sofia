@@ -1,12 +1,14 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
-import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 import { firebaseConfig } from './firebase-config.js';
 
 let app, auth, db;
-let uid = null;
+let currentUser = null;
 let useFirebase = false;
+let historyDocs = [];
+let unsubHistory = null;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -18,7 +20,7 @@ try {
     const mainApp = document.getElementById('mainApp');
 
     if (user) {
-      uid = user.uid;
+      currentUser = user;
       useFirebase = true;
       if (loginScreen) loginScreen.style.display = 'none';
       if (mainApp) mainApp.style.display = 'flex';
@@ -26,12 +28,20 @@ try {
       const statusEl = document.getElementById('statusTxt');
       if (statusEl) statusEl.textContent = `LOGGED IN AS: ${user.email}`;
 
-      setupRealtimeTodos();
+      syncData('todos', collection(db, "users", user.uid, "todos"), renderTodos);
+      syncData('exams', collection(db, "users", user.uid, "exams"), renderExams);
+      setupRealtimeHistory();
     } else {
-      uid = null;
+      currentUser = null;
       useFirebase = false;
       if (loginScreen) loginScreen.style.display = 'block';
       if (mainApp) mainApp.style.display = 'none';
+      
+      if (unsubHistory) { unsubHistory(); unsubHistory = null; }
+      
+      document.getElementById('todoList').innerHTML = "<li>Please sign in to view items.</li>";
+      document.getElementById('examList').innerHTML = "";
+      renderHistory();
     }
   });
 
@@ -81,32 +91,26 @@ let timerEnd = null;
 let sessions = parseInt(localStorage.getItem('pomo_sessions')) || 0;
 let alarmIv = null;
 let alarmNodes = [];
-let todos = JSON.parse(localStorage.getItem('pomo_todos')) || [];
-let todoId = todos.length > 0 ? Math.max(...todos.map(t => typeof t.id === 'number' ? t.id : 0)) + 1 : 0;
 let pendingNextMode = null;
 let audioCtx = null;
 let audioUnlocked = false;
-let unsubTodos = null;
 
-function setupRealtimeTodos() {
-  if (!useFirebase || !uid) return;
-  const todosRef = collection(db, `users/${uid}/todos`);
-  unsubTodos = onSnapshot(todosRef, (snapshot) => {
-    todos = [];
+// History logic
+function setupRealtimeHistory() {
+  if (!useFirebase || !currentUser) return;
+  const historyRef = collection(db, `users/${currentUser.uid}/history`);
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const q = query(historyRef, where("timestamp", ">=", sevenDaysAgo));
+  
+  unsubHistory = onSnapshot(q, (snapshot) => {
+    historyDocs = [];
     snapshot.forEach((doc) => {
-      todos.push({ id: doc.id, txt: doc.data().txt, done: doc.data().done, createdAt: doc.data().createdAt });
+      historyDocs.push(doc.data());
     });
-    // Sort by creation time
-    todos.sort((a, b) => {
-      const timeA = a.createdAt?.toMillis() || 0;
-      const timeB = b.createdAt?.toMillis() || 0;
-      return timeA - timeB;
-    });
-    renderTodos(true); 
+    historyDocs.sort((a, b) => b.timestamp - a.timestamp);
+    renderHistory();
   }, (error) => {
-    console.error("Firestore onSnapshot error:", error);
-    useFirebase = false;
-    renderTodos();
+    console.error("Firestore history error:", error);
   });
 }
 
@@ -269,17 +273,22 @@ function handleStart() {
 async function onEnd() {
   timerEnd = null;
 
-  if (useFirebase && uid) {
+  const historyItem = {
+    timestamp: Date.now(),
+    mode: mode,
+    durationMinutes: CFG[mode]
+  };
+
+  if (useFirebase && currentUser) {
     try {
-      const historyRef = collection(db, `users/${uid}/history`);
-      await addDoc(historyRef, {
-        timestamp: Date.now(),
-        mode: mode,
-        durationMinutes: CFG[mode]
-      });
+      const historyRef = collection(db, `users/${currentUser.uid}/history`);
+      await addDoc(historyRef, historyItem);
     } catch (e) {
       console.error("Failed to save history to Firestore", e);
+      addHistoryLocal(historyItem);
     }
+  } else {
+    addHistoryLocal(historyItem);
   }
 
   if (mode === 'focus') {
@@ -293,6 +302,51 @@ async function onEnd() {
   document.getElementById('alarmBar').classList.add('on');
   playLoop();
   document.getElementById('statusTxt').textContent = '★ CLICK BANNER TO CONTINUE ★';
+}
+
+function addHistoryLocal(item) {
+  let localHist = JSON.parse(localStorage.getItem('pomo_history')) || [];
+  localHist.push(item);
+  localStorage.setItem('pomo_history', JSON.stringify(localHist));
+  renderHistory();
+}
+
+function renderHistory() {
+  const summaryEl = document.getElementById('historySummary');
+  const listEl = document.getElementById('historyList');
+  if (!summaryEl || !listEl) return;
+
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let items = useFirebase ? historyDocs : (JSON.parse(localStorage.getItem('pomo_history')) || []);
+  
+  items = items.filter(i => i.timestamp >= sevenDaysAgo);
+  items.sort((a, b) => b.timestamp - a.timestamp);
+
+  let totalMins = items.reduce((acc, curr) => acc + (curr.durationMinutes || 0), 0);
+  summaryEl.textContent = `7-DAY: ${items.length} SESSIONS (${totalMins} MINS)`;
+
+  if (items.length === 0) {
+    listEl.innerHTML = '<div class="todo-empty">NO HISTORY YET ★</div>';
+    return;
+  }
+  
+  listEl.innerHTML = '';
+  items.forEach(item => {
+    const d = new Date(item.timestamp);
+    const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    
+    const el = document.createElement('div');
+    el.className = 'todo-item'; 
+    el.style.cursor = 'default';
+    el.innerHTML = `
+      <div class="todo-txt" style="font-size: 15px; display: flex; justify-content: space-between;">
+        <span>${item.mode.toUpperCase()} - ${item.durationMinutes}M</span>
+        <span style="color: var(--muted);">${dateStr} ${timeStr}</span>
+      </div>
+    `;
+    listEl.appendChild(el);
+  });
 }
 
 function stopAlarmAndNext() {
@@ -345,98 +399,139 @@ function updateDots() {
   document.getElementById('nextLbl').textContent = 'NEXT: ' + modeLabels[getNextMode(mode)];
 }
 
-async function addTodo() {
-  const inp = document.getElementById('todoInp');
-  const txt = inp.value.trim();
-  if (!txt) return;
-  inp.value = '';
-
-  if (useFirebase && uid) {
-    try {
-      const todosRef = collection(db, `users/${uid}/todos`);
-      await addDoc(todosRef, {
-        txt: txt,
-        done: false,
-        createdAt: serverTimestamp()
-      });
-    } catch (e) {
-      console.error("Failed to add to Firestore", e);
-      addTodoLocal(txt);
+// ---- GENERIC FIRESTORE SYNC ----
+function syncData(type, colRef, renderFn) {
+  onSnapshot(colRef, (snapshot) => {
+    const items = [];
+    snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+    // Quick sort to keep it stable
+    if (type === 'exams') {
+      items.sort((a, b) => new Date(a.date) - new Date(b.date));
     }
-  } else {
-    addTodoLocal(txt);
-  }
-  inp.focus();
+    renderFn(items);
+  });
 }
 
-function addTodoLocal(txt) {
-  todos.push({ id: todoId++, txt, done: false });
-  renderTodos();
-}
+// --- TODO OPERATIONS ---
+document.getElementById('addTodoBtn')?.addEventListener('click', async () => {
+  const text = document.getElementById('todoInp').value.trim();
+  if (!text || !currentUser) return;
+  await addDoc(collection(db, "users", currentUser.uid, "todos"), { text, done: false });
+  document.getElementById('todoInp').value = "";
+});
+document.getElementById('todoInp')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('addTodoBtn').click();
+  if (e.key === 'Escape') e.target.value = '';
+});
 
-async function toggleTodo(id) {
-  const t = todos.find(x => x.id === id);
-  if (!t) return;
-
-  if (useFirebase && uid && typeof id === 'string') {
-    try {
-      const todoRef = doc(db, `users/${uid}/todos/${id}`);
-      await updateDoc(todoRef, { done: !t.done });
-    } catch (e) {
-      console.error("Failed to toggle in Firestore", e);
-      t.done = !t.done;
-      renderTodos();
-    }
-  } else {
-    t.done = !t.done;
-    renderTodos();
-  }
-}
-
-async function deleteTodo(id) {
-  if (useFirebase && uid && typeof id === 'string') {
-    try {
-      const todoRef = doc(db, `users/${uid}/todos/${id}`);
-      await deleteDoc(todoRef);
-    } catch (e) {
-      console.error("Failed to delete from Firestore", e);
-      deleteTodoLocal(id);
-    }
-  } else {
-    deleteTodoLocal(id);
-  }
-}
-
-function deleteTodoLocal(id) {
-  todos = todos.filter(x => x.id !== id);
-  renderTodos();
-}
-
-function renderTodos(fromSnapshot = false) {
-  if (!fromSnapshot || !useFirebase) {
-    localStorage.setItem('pomo_todos', JSON.stringify(todos));
-  }
+function renderTodos(todos) {
   const list = document.getElementById('todoList');
-  const stats = document.getElementById('todoStats');
+  if (!list) return;
+  
   if (todos.length === 0) {
     list.innerHTML = '<div class="todo-empty">NO TASKS YET ★<br>ADD ONE ABOVE!</div>';
-    stats.textContent = ''; return;
+    return;
   }
-  list.innerHTML = '';
-  todos.forEach(t => {
-    const item = document.createElement('div');
-    item.className = 'todo-item' + (t.done ? ' done' : '');
-    item.onclick = () => toggleTodo(t.id);
-    const safeId = typeof t.id === 'string' ? `'${t.id}'` : t.id;
-    item.innerHTML =
-      '<div class="todo-check">' + (t.done ? '✓' : '') + '</div>' +
-      '<div class="todo-txt">' + t.txt.replace(/</g, '&lt;') + '</div>' +
-      '<button class="del-btn" onclick="event.stopPropagation();deleteTodo(' + safeId + ')">✕</button>';
-    list.appendChild(item);
-  });
-  const done = todos.filter(x => x.done).length;
-  stats.textContent = done + '/' + todos.length + ' DONE ★';
+  
+  list.innerHTML = todos.map(t => `
+    <li class="todo-item ${t.done ? 'done' : ''}" style="margin-bottom: 6px;">
+      <span class="todo-txt" style="cursor: pointer; display: flex; align-items: center; gap: 8px;" onclick="toggleTodo('${t.id}', ${t.done})">
+        <div class="todo-check">${t.done ? '✓' : ''}</div>
+        ${t.text.replace(/</g, '&lt;')}
+      </span>
+      <div style="display: flex; gap: 4px; margin-left: auto;">
+        <button class="del-btn" onclick="editItem('todos', '${t.id}', '${t.text.replace(/'/g, "\\'")}')" style="opacity: 1; font-size: 14px;">✏️</button>
+        <button class="del-btn" onclick="deleteItem('todos', '${t.id}')" style="opacity: 1;">✕</button>
+      </div>
+    </li>
+  `).join('');
 }
+
+// --- EXAM OPERATIONS ---
+document.getElementById('addExamBtn')?.addEventListener('click', async () => {
+  const name = document.getElementById('examNameInp').value.trim();
+  const date = document.getElementById('examDateInp').value;
+  if (!name || !date || !currentUser) return;
+  await addDoc(collection(db, "users", currentUser.uid, "exams"), { name, date });
+  document.getElementById('examNameInp').value = "";
+  document.getElementById('examDateInp').value = "";
+});
+document.getElementById('examNameInp')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('addExamBtn').click();
+});
+
+function renderExams(exams) {
+  const list = document.getElementById('examList');
+  if (!list) return;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  if (exams.length === 0) {
+    list.innerHTML = '<div class="todo-empty">NO TESTS UPCOMING ★</div>';
+    return;
+  }
+
+  list.innerHTML = exams.map(e => {
+    const examDate = new Date(e.date);
+    examDate.setHours(0,0,0,0);
+    const daysLeft = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
+    
+    let style = "color: var(--text);";
+    let statusText = `${daysLeft} days left`;
+    
+    if (daysLeft === 0) {
+      style = "color: #c04080; font-weight: bold;";
+      statusText = "🚨 TODAY!!!";
+    } else if (daysLeft > 0 && daysLeft <= 3) {
+      style = "color: #c04080;";
+      statusText = `⚠️ ONLY ${daysLeft} DAYS LEFT!`;
+    } else if (daysLeft < 0) {
+      style = "color: var(--muted); text-decoration: line-through;";
+      statusText = "PASSED";
+    }
+
+    return `
+      <li class="todo-item" style="margin-bottom: 6px; ${style}">
+        <span class="todo-txt" style="display: flex; flex-direction: column; gap: 4px;">
+          <strong>${e.name.replace(/</g, '&lt;')}</strong>
+          <span style="font-size: 13px; color: var(--pink); background: var(--dark); padding: 2px 6px; border-radius: 4px; align-self: flex-start; letter-spacing: 1px;">📅 ${e.date} (${statusText})</span>
+        </span>
+        <div style="display: flex; gap: 4px; margin-left: auto;">
+          <button class="del-btn" onclick="editExam('${e.id}', '${e.name.replace(/'/g, "\\'")}', '${e.date}')" style="opacity: 1; font-size: 14px;">✏️</button>
+          <button class="del-btn" onclick="deleteItem('exams', '${e.id}')" style="opacity: 1;">✕</button>
+        </div>
+      </li>
+    `;
+  }).join('');
+}
+
+// --- GLOBAL MUTATION UTILITIES ---
+window.toggleTodo = async (id, currentStatus) => {
+  if(!currentUser) return;
+  await updateDoc(doc(db, "users", currentUser.uid, "todos", id), { done: !currentStatus });
+};
+
+window.deleteItem = async (type, id) => {
+  if (currentUser && confirm("Delete this item?")) {
+    await deleteDoc(doc(db, "users", currentUser.uid, type, id));
+  }
+};
+
+window.editItem = async (type, id, oldText) => {
+  const newText = prompt(`Edit entry:`, oldText);
+  if (currentUser && newText && newText.trim() !== "") {
+    await updateDoc(doc(db, "users", currentUser.uid, type, id), { text: newText.trim() });
+  }
+};
+
+window.editExam = async (id, oldName, oldDate) => {
+  const newName = prompt("Edit Exam Name:", oldName);
+  if (!newName || !currentUser) return;
+  const newDate = prompt("Edit Exam Date (YYYY-MM-DD):", oldDate);
+  if (!newDate) return;
+  await updateDoc(doc(db, "users", currentUser.uid, "exams", id), { name: newName.trim(), date: newDate });
+};
+
 
 function drawTimerOnCanvas() {
   const canvas = document.getElementById('timerCanvas');
@@ -512,14 +607,17 @@ async function togglePiP() {
 }
 
 window.addEventListener('load', () => {
-  document.getElementById('startBtn').classList.add('idle-pulse');
-  document.getElementById('inp-focus').value = CFG.focus;
-  document.getElementById('inp-short').value = CFG.short;
-  document.getElementById('inp-long').value = CFG.long;
+  document.getElementById('startBtn')?.classList.add('idle-pulse');
+  const inpFocus = document.getElementById('inp-focus');
+  if (inpFocus) {
+    inpFocus.value = CFG.focus;
+    document.getElementById('inp-short').value = CFG.short;
+    document.getElementById('inp-long').value = CFG.long;
+  }
   updateDisp();
   updateRing();
   updateDots();
-  renderTodos();
+  renderHistory();
 });
 
 // Expose globals for index.html inline event handlers
@@ -530,5 +628,3 @@ window.handleStart = handleStart;
 window.handleSkip = handleSkip;
 window.applyCustom = applyCustom;
 window.stopAlarmAndNext = stopAlarmAndNext;
-window.addTodo = addTodo;
-window.deleteTodo = deleteTodo;

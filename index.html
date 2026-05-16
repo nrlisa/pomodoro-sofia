@@ -23,106 +23,130 @@
 </div>
 
 <div class="wrap" id="mainApp" style="display: none;">
-  <!-- TIMER PANEL -->
-  <div class="panel timer-panel">
-    <div class="win-bar">
-      <span class="win-title">★ P0M0D0R0.EXE</span>
-      <div class="win-btns">
-        <button class="wbtn" onclick="togglePiP()" title="Mini Player">◱</button>
-        <div class="wbtn">_</div>
-        <div class="wbtn">□</div>
-        <div class="wbtn">×</div>
+  <div class="col-left">
+    <!-- TIMER PANEL -->
+    <div class="panel timer-panel">
+      <div class="win-bar">
+        <span class="win-title">★ P0M0D0R0.EXE</span>
+        <div class="win-btns">
+          <button class="wbtn" onclick="togglePiP()" title="Mini Player">◱</button>
+          <div class="wbtn">_</div>
+          <div class="wbtn">□</div>
+          <div class="wbtn">×</div>
+        </div>
+      </div>
+
+      <div class="timer-body">
+        <div class="mode-tabs">
+          <button class="mtab active" onclick="setMode('focus')" id="tab-focus">FOCUS</button>
+          <button class="mtab" onclick="setMode('short')" id="tab-short">SHORT</button>
+          <button class="mtab" onclick="setMode('long')" id="tab-long">LONG</button>
+        </div>
+
+        <div class="clock-ring">
+          <svg class="clock-svg" viewBox="0 0 170 170">
+            <circle class="ring-bg" cx="85" cy="85" r="72"/>
+            <circle class="ring-fill" id="ring" cx="85" cy="85" r="72"
+              stroke-dasharray="452.4" stroke-dashoffset="0"/>
+          </svg>
+          <div class="clock-center">
+            <div class="time-disp" id="timeDisp">25:00</div>
+            <div class="mode-lbl" id="modeLbl">FOCUS TIME</div>
+            <div class="next-lbl" id="nextLbl">NEXT: SHORT BREAK</div>
+          </div>
+        </div>
+
+        <div class="dots">
+          <span class="dot-lbl">SESSIONS:</span>
+          <div class="dot" id="d1"></div>
+          <div class="dot" id="d2"></div>
+          <div class="dot" id="d3"></div>
+          <div class="dot" id="d4"></div>
+        </div>
+
+        <div class="controls">
+          <button class="btn" onclick="handleReset()">RESET</button>
+          <button class="btn primary" id="startBtn" onclick="handleStart()">START</button>
+          <button class="btn" onclick="handleSkip()">SKIP</button>
+        </div>
+      </div>
+
+      <canvas id="timerCanvas" width="120" height="120" style="display:none;"></canvas>
+      <video id="pipVideo" width="120" height="120" style="display:none;"></video>
+
+      <div class="custom-section">
+        <div class="custom-title">✦ CUSTOMIZE TIMES (MIN)</div>
+        <div class="custom-grid">
+          <div class="custom-item">
+            <span class="custom-lbl">FOCUS</span>
+            <input class="custom-inp" type="number" id="inp-focus" value="25" min="1" max="120">
+          </div>
+          <div class="custom-item">
+            <span class="custom-lbl">SHORT</span>
+            <input class="custom-inp" type="number" id="inp-short" value="5" min="1" max="60">
+          </div>
+          <div class="custom-item">
+            <span class="custom-lbl">LONG</span>
+            <input class="custom-inp" type="number" id="inp-long" value="15" min="1" max="90">
+          </div>
+        </div>
+        <button class="apply-btn" onclick="applyCustom()">APPLY CHANGES ★</button>
+      </div>
+
+      <div class="audio-hint" id="audioHint">★ CLICK START TO UNLOCK SOUND ★</div>
+      <button class="alarm-bar" id="alarmBar" onclick="stopAlarmAndNext()"></button>
+
+      <div class="status-bar">
+        <span class="stxt" id="statusTxt">READY</span>
+        <span class="stxt">Y2K EDITION</span>
       </div>
     </div>
 
-    <div class="timer-body">
-      <div class="mode-tabs">
-        <button class="mtab active" onclick="setMode('focus')" id="tab-focus">FOCUS</button>
-        <button class="mtab" onclick="setMode('short')" id="tab-short">SHORT</button>
-        <button class="mtab" onclick="setMode('long')" id="tab-long">LONG</button>
-      </div>
-
-      <div class="clock-ring">
-        <svg class="clock-svg" viewBox="0 0 170 170">
-          <circle class="ring-bg" cx="85" cy="85" r="72"/>
-          <circle class="ring-fill" id="ring" cx="85" cy="85" r="72"
-            stroke-dasharray="452.4" stroke-dashoffset="0"/>
-        </svg>
-        <div class="clock-center">
-          <div class="time-disp" id="timeDisp">25:00</div>
-          <div class="mode-lbl" id="modeLbl">FOCUS TIME</div>
-          <div class="next-lbl" id="nextLbl">NEXT: SHORT BREAK</div>
+    <!-- HISTORY PANEL -->
+    <div class="panel history-panel" style="margin-top: 16px;">
+      <div class="win-bar" style="background: var(--mint);">
+        <span class="win-title">★ HISTORY.EXE</span>
+        <div class="win-btns">
+          <div class="wbtn">_</div>
+          <div class="wbtn">□</div>
+          <div class="wbtn">×</div>
         </div>
       </div>
-
-      <div class="dots">
-        <span class="dot-lbl">SESSIONS:</span>
-        <div class="dot" id="d1"></div>
-        <div class="dot" id="d2"></div>
-        <div class="dot" id="d3"></div>
-        <div class="dot" id="d4"></div>
-      </div>
-
-      <div class="controls">
-        <button class="btn" onclick="handleReset()">RESET</button>
-        <button class="btn primary" id="startBtn" onclick="handleStart()">START</button>
-        <button class="btn" onclick="handleSkip()">SKIP</button>
-      </div>
-    </div>
-
-    <canvas id="timerCanvas" width="120" height="120" style="display:none;"></canvas>
-    <video id="pipVideo" width="120" height="120" style="display:none;"></video>
-
-    <div class="custom-section">
-      <div class="custom-title">✦ CUSTOMIZE TIMES (MIN)</div>
-      <div class="custom-grid">
-        <div class="custom-item">
-          <span class="custom-lbl">FOCUS</span>
-          <input class="custom-inp" type="number" id="inp-focus" value="25" min="1" max="120">
+      <div class="history-body" style="padding: 16px;">
+        <div class="history-summary" id="historySummary" style="font-family: 'VT323', monospace; font-size: 16px; margin-bottom: 10px; color: var(--dark); text-align: center; border-bottom: 2px dashed var(--border); padding-bottom: 8px;">
+          7-DAY: 0 SESSIONS (0 MINS)
         </div>
-        <div class="custom-item">
-          <span class="custom-lbl">SHORT</span>
-          <input class="custom-inp" type="number" id="inp-short" value="5" min="1" max="60">
-        </div>
-        <div class="custom-item">
-          <span class="custom-lbl">LONG</span>
-          <input class="custom-inp" type="number" id="inp-long" value="15" min="1" max="90">
+        <div class="history-list" id="historyList" style="display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; padding-right: 4px;">
+          <div class="todo-empty">NO HISTORY YET ★</div>
         </div>
       </div>
-      <button class="apply-btn" onclick="applyCustom()">APPLY CHANGES ★</button>
-    </div>
-
-    <div class="audio-hint" id="audioHint">★ CLICK START TO UNLOCK SOUND ★</div>
-    <button class="alarm-bar" id="alarmBar" onclick="stopAlarmAndNext()"></button>
-
-    <div class="status-bar">
-      <span class="stxt" id="statusTxt">READY</span>
-      <span class="stxt">Y2K EDITION</span>
     </div>
   </div>
 
-  <!-- TODO PANEL -->
-  <div class="panel todo-panel">
-    <div class="win-bar" style="background: var(--blue);">
-      <span class="win-title">★ T0D0LIST.EXE</span>
-      <div class="win-btns">
-        <div class="wbtn">_</div>
-        <div class="wbtn">□</div>
-        <div class="wbtn">×</div>
+  <div class="col-right">
+    <!-- EXAM COUNTDOWN PANEL -->
+    <div class="panel" style="width: 100%; margin-bottom: 12px;">
+      <div class="win-bar"><span class="win-title">★ EXAM_COUNTDOWN.EXE</span></div>
+      <div class="todo-body">
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+          <input class="todo-inp" type="text" id="examNameInp" placeholder="Exam Name (e.g., Cloud Security)" style="flex: 2;">
+          <input class="todo-inp" type="date" id="examDateInp" style="flex: 1; padding: 6px;">
+          <button class="add-btn" id="addExamBtn" style="padding: 2px 8px; background: var(--pink); box-shadow: 2px 2px 0 #d080b0;">ADD</button>
+        </div>
+        <ul id="examList" class="todo-list" style="list-style: none; padding: 0; margin: 0;"></ul>
       </div>
     </div>
 
-    <div class="todo-body">
-      <div class="todo-add">
-        <input class="todo-inp" type="text" id="todoInp"
-          placeholder="ADD NEW TASK..." maxlength="80"
-          onkeydown="if(event.key==='Enter') addTodo(); else if(event.key==='Escape') this.value='';">
-        <button class="add-btn" onclick="addTodo()">+ ADD</button>
+    <!-- TODO LIST PANEL -->
+    <div class="panel" style="width: 100%;">
+      <div class="win-bar" style="background: var(--blue);"><span class="win-title">★ TODO_LIST.EXE</span></div>
+      <div class="todo-body">
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+          <input class="todo-inp" type="text" id="todoInp" placeholder="Add new task..." style="flex: 1;">
+          <button class="add-btn" id="addTodoBtn" style="padding: 2px 8px;">ADD</button>
+        </div>
+        <ul id="todoList" class="todo-list" style="list-style: none; padding: 0; margin: 0;"></ul>
       </div>
-      <div class="todo-list" id="todoList">
-        <div class="todo-empty">NO TASKS YET ★<br>ADD ONE ABOVE!</div>
-      </div>
-      <div class="todo-stats" id="todoStats"></div>
     </div>
   </div>
 </div>

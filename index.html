@@ -57,8 +57,8 @@
       </div>
     </div>
 
-    <canvas id="timerCanvas" width="200" height="200" style="display:none;"></canvas>
-    <video id="pipVideo" width="200" height="200" style="display:none;"></video>
+    <canvas id="timerCanvas" width="120" height="120" style="display:none;"></canvas>
+    <video id="pipVideo" width="120" height="120" style="display:none;"></video>
 
     <div class="custom-section">
       <div class="custom-title">✦ CUSTOMIZE TIMES (MIN)</div>
@@ -103,7 +103,7 @@
       <div class="todo-add">
         <input class="todo-inp" type="text" id="todoInp"
           placeholder="ADD NEW TASK..." maxlength="80"
-          onkeydown="if(event.key==='Enter') addTodo()">
+          onkeydown="if(event.key==='Enter') addTodo(); else if(event.key==='Escape') this.value='';">
         <button class="add-btn" onclick="addTodo()">+ ADD</button>
       </div>
       <div class="todo-list" id="todoList">
@@ -114,6 +114,28 @@
   </div>
 </div>
 
-<script src="script.js"></script>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0ZS2jkFXovyltEIp-3RnlqOenDbhjg0E",
+    authDomain: "pomodoro-64c4d.firebaseapp.com",
+    projectId: "pomodoro-64c4d",
+    storageBucket: "pomodoro-64c4d.firebasestorage.app",
+    messagingSenderId: "797674558260",
+    appId: "1:797674558260:web:bf598917021e714d098b61"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  if (app) {
+    console.log("Firebase successfully initialized!", app.name);
+  }
+</script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

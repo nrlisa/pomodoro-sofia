@@ -1,3 +1,46 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+// TODO: Replace with your actual Firebase config
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let app, auth, db;
+let uid = null;
+let useFirebase = false;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  
+  signInAnonymously(auth).catch((error) => {
+    console.error("Firebase Anonymous Auth failed:", error);
+    useFirebase = false;
+  });
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      uid = user.uid;
+      useFirebase = true;
+      setupRealtimeTodos();
+    } else {
+      uid = null;
+      useFirebase = false;
+    }
+  });
+} catch (e) {
+  console.error("Firebase init failed. Falling back to localStorage.", e);
+  useFirebase = false;
+}
+
 const CIRC = 452.4;
 const loadCFG = () => JSON.parse(localStorage.getItem('pomo_cfg')) || { focus: 25, short: 5, long: 15 };
 let CFG = loadCFG();
@@ -11,10 +54,34 @@ let sessions = parseInt(localStorage.getItem('pomo_sessions')) || 0;
 let alarmIv = null;
 let alarmNodes = [];
 let todos = JSON.parse(localStorage.getItem('pomo_todos')) || [];
-let todoId = todos.length > 0 ? Math.max(...todos.map(t => t.id)) + 1 : 0;
+let todoId = todos.length > 0 ? Math.max(...todos.map(t => typeof t.id === 'number' ? t.id : 0)) + 1 : 0;
+let activeTodoId = null;
 let pendingNextMode = null;
 let audioCtx = null;
 let audioUnlocked = false;
+let unsubTodos = null;
+
+function setupRealtimeTodos() {
+  if (!useFirebase || !uid) return;
+  const todosRef = collection(db, `users/${uid}/todos`);
+  unsubTodos = onSnapshot(todosRef, (snapshot) => {
+    todos = [];
+    snapshot.forEach((doc) => {
+      todos.push({ id: doc.id, txt: doc.data().txt, done: doc.data().done, createdAt: doc.data().createdAt });
+    });
+    // Sort by creation time
+    todos.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis() || 0;
+      const timeB = b.createdAt?.toMillis() || 0;
+      return timeA - timeB;
+    });
+    renderTodos(true); 
+  }, (error) => {
+    console.error("Firestore onSnapshot error:", error);
+    useFirebase = false;
+    renderTodos();
+  });
+}
 
 function ensureAudio() {
   if (!audioCtx) {
@@ -32,7 +99,10 @@ function ensureAudio() {
     audioUnlocked = true;
     const hint = document.getElementById('audioHint');
     hint.textContent = '★ SOUND UNLOCKED ★';
-    setTimeout(() => { hint.style.display = 'none'; }, 1500);
+    setTimeout(() => { 
+      hint.style.opacity = '0'; 
+      setTimeout(() => hint.style.display = 'none', 500); 
+    }, 1500);
   }
 }
 
@@ -88,6 +158,7 @@ function setMode(m, autoStart) {
   document.getElementById('modeLbl').textContent = modeLabels[m];
   document.getElementById('nextLbl').textContent = 'NEXT: ' + modeLabels[getNextMode(m)];
   document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').classList.add('idle-pulse');
   updateDisp(); updateRing();
   if (autoStart) {
     document.getElementById('statusTxt').textContent = 'AUTO-STARTING...';
@@ -129,6 +200,7 @@ function tickTimer() {
     iv = null;
     running = false;
     document.getElementById('startBtn').textContent = 'START';
+    document.getElementById('startBtn').classList.add('idle-pulse');
     onEnd();
     return;
   }
@@ -146,6 +218,7 @@ function startTimer() {
     timerEnd = Date.now() + secsLeft * 1000;
   }
   document.getElementById('startBtn').textContent = 'PAUSE';
+  document.getElementById('startBtn').classList.remove('idle-pulse');
   document.getElementById('statusTxt').textContent = 'RUNNING...';
   tickTimer();
   iv = setInterval(tickTimer, 250);
@@ -159,14 +232,29 @@ function handleStart() {
     timerEnd = null;
     running = false;
     document.getElementById('startBtn').textContent = 'START';
+    document.getElementById('startBtn').classList.add('idle-pulse');
     document.getElementById('statusTxt').textContent = 'PAUSED';
   } else {
     startTimer();
   }
 }
 
-function onEnd() {
+async function onEnd() {
   timerEnd = null;
+
+  if (useFirebase && uid) {
+    try {
+      const historyRef = collection(db, `users/${uid}/history`);
+      await addDoc(historyRef, {
+        timestamp: Date.now(),
+        mode: mode,
+        durationMinutes: CFG[mode]
+      });
+    } catch (e) {
+      console.error("Failed to save history to Firestore", e);
+    }
+  }
+
   if (mode === 'focus') {
     sessions = Math.min(sessions + 1, 4);
     localStorage.setItem('pomo_sessions', sessions);
@@ -193,6 +281,7 @@ function handleReset() {
   clearInterval(iv); iv = null; timerEnd = null;
   stopSound(); running = false;
   document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').classList.add('idle-pulse');
   document.getElementById('alarmBar').classList.remove('on');
   pendingNextMode = null;
   secsLeft = totalSecs; updateDisp(); updateRing();
@@ -204,6 +293,7 @@ function handleSkip() {
   clearInterval(iv); iv = null; timerEnd = null;
   stopSound(); running = false;
   document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').classList.add('idle-pulse');
   document.getElementById('alarmBar').classList.remove('on');
   if (mode === 'focus') {
     sessions = Math.min(sessions + 1, 4);
@@ -228,27 +318,77 @@ function updateDots() {
   document.getElementById('nextLbl').textContent = 'NEXT: ' + modeLabels[getNextMode(mode)];
 }
 
-function addTodo() {
+async function addTodo() {
   const inp = document.getElementById('todoInp');
   const txt = inp.value.trim();
   if (!txt) return;
-  todos.push({ id: todoId++, txt, done: false });
   inp.value = '';
+
+  if (useFirebase && uid) {
+    try {
+      const todosRef = collection(db, `users/${uid}/todos`);
+      await addDoc(todosRef, {
+        txt: txt,
+        done: false,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Failed to add to Firestore", e);
+      addTodoLocal(txt);
+    }
+  } else {
+    addTodoLocal(txt);
+  }
+  inp.focus();
+}
+
+function addTodoLocal(txt) {
+  todos.push({ id: todoId++, txt, done: false });
   renderTodos();
 }
 
-function toggleTodo(id) {
+async function toggleTodo(id) {
   const t = todos.find(x => x.id === id);
-  if (t) { t.done = !t.done; renderTodos(); }
+  if (!t) return;
+
+  if (useFirebase && uid && typeof id === 'string') {
+    try {
+      const todoRef = doc(db, `users/${uid}/todos/${id}`);
+      await updateDoc(todoRef, { done: !t.done });
+    } catch (e) {
+      console.error("Failed to toggle in Firestore", e);
+      t.done = !t.done;
+      renderTodos();
+    }
+  } else {
+    t.done = !t.done;
+    renderTodos();
+  }
 }
 
-function deleteTodo(id) {
+async function deleteTodo(id) {
+  if (useFirebase && uid && typeof id === 'string') {
+    try {
+      const todoRef = doc(db, `users/${uid}/todos/${id}`);
+      await deleteDoc(todoRef);
+    } catch (e) {
+      console.error("Failed to delete from Firestore", e);
+      deleteTodoLocal(id);
+    }
+  } else {
+    deleteTodoLocal(id);
+  }
+}
+
+function deleteTodoLocal(id) {
   todos = todos.filter(x => x.id !== id);
   renderTodos();
 }
 
-function renderTodos() {
-  localStorage.setItem('pomo_todos', JSON.stringify(todos));
+function renderTodos(fromSnapshot = false) {
+  if (!fromSnapshot || !useFirebase) {
+    localStorage.setItem('pomo_todos', JSON.stringify(todos));
+  }
   const list = document.getElementById('todoList');
   const stats = document.getElementById('todoStats');
   if (todos.length === 0) {
@@ -260,10 +400,11 @@ function renderTodos() {
     const item = document.createElement('div');
     item.className = 'todo-item' + (t.done ? ' done' : '');
     item.onclick = () => toggleTodo(t.id);
+    const safeId = typeof t.id === 'string' ? `'${t.id}'` : t.id;
     item.innerHTML =
       '<div class="todo-check">' + (t.done ? '✓' : '') + '</div>' +
       '<div class="todo-txt">' + t.txt.replace(/</g, '&lt;') + '</div>' +
-      '<button class="del-btn" onclick="event.stopPropagation();deleteTodo(' + t.id + ')">✕</button>';
+      '<button class="del-btn" onclick="event.stopPropagation();deleteTodo(' + safeId + ')">✕</button>';
     list.appendChild(item);
   });
   const done = todos.filter(x => x.done).length;
@@ -273,29 +414,29 @@ function renderTodos() {
 function drawTimerOnCanvas() {
   const canvas = document.getElementById('timerCanvas');
   const ctx = canvas.getContext('2d');
-  const size = 200;
+  const size = 120;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = 80;
+  const radius = 50;
 
   ctx.fillStyle = '#fdf0f8';
   ctx.fillRect(0, 0, size, size);
 
   ctx.strokeStyle = '#f0ddf0';
-  ctx.lineWidth = 12;
+  ctx.lineWidth = 8;
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.stroke();
 
   const progress = secsLeft / totalSecs;
   ctx.strokeStyle = mode === 'focus' ? '#f0a0c8' : (mode === 'short' ? '#a0c0f8' : '#c0a0f8');
-  ctx.lineWidth = 12;
+  ctx.lineWidth = 8;
   ctx.beginPath();
   ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
   ctx.stroke();
 
   ctx.fillStyle = '#d060a0';
-  ctx.font = 'bold 52px VT323';
+  ctx.font = 'bold 30px VT323';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const m = String(Math.floor(secsLeft / 60)).padStart(2, '0');
@@ -303,8 +444,8 @@ function drawTimerOnCanvas() {
   ctx.fillText(m + ':' + s, cx, cy - 10);
 
   ctx.fillStyle = '#9a7ab8';
-  ctx.font = '12px VT323';
-  ctx.fillText(modeLabels[mode], cx, cy + 25);
+  ctx.font = '9px VT323';
+  ctx.fillText(modeLabels[mode], cx, cy + 20);
 }
 
 async function togglePiP() {
@@ -344,6 +485,7 @@ async function togglePiP() {
 }
 
 window.addEventListener('load', () => {
+  document.getElementById('startBtn').classList.add('idle-pulse');
   document.getElementById('inp-focus').value = CFG.focus;
   document.getElementById('inp-short').value = CFG.short;
   document.getElementById('inp-long').value = CFG.long;
@@ -352,3 +494,14 @@ window.addEventListener('load', () => {
   updateDots();
   renderTodos();
 });
+
+// Expose globals for index.html inline event handlers
+window.togglePiP = togglePiP;
+window.setMode = setMode;
+window.handleReset = handleReset;
+window.handleStart = handleStart;
+window.handleSkip = handleSkip;
+window.applyCustom = applyCustom;
+window.stopAlarmAndNext = stopAlarmAndNext;
+window.addTodo = addTodo;
+window.deleteTodo = deleteTodo;

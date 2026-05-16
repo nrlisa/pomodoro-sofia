@@ -94,6 +94,7 @@ let alarmNodes = [];
 let pendingNextMode = null;
 let audioCtx = null;
 let audioUnlocked = false;
+let hasStartedCurrentSession = false;
 
 // History logic
 function setupRealtimeHistory() {
@@ -179,6 +180,7 @@ const modeLabels = { focus: 'FOCUS TIME', short: 'SHORT BREAK', long: 'LONG BREA
 function setMode(m, autoStart) {
   if (running && !autoStart) return;
   clearInterval(iv); iv = null; timerEnd = null; running = false;
+  hasStartedCurrentSession = false;
   mode = m;
   totalSecs = CFG[m] * 60;
   secsLeft = totalSecs;
@@ -187,13 +189,39 @@ function setMode(m, autoStart) {
   document.getElementById('timeDisp').className = 'time-disp ' + modeColors[m];
   document.getElementById('ring').className = 'ring-fill ' + modeColors[m];
   document.getElementById('modeLbl').textContent = modeLabels[m];
-  document.getElementById('nextLbl').textContent = 'NEXT: ' + modeLabels[getNextMode(m)];
-  document.getElementById('startBtn').textContent = 'START';
-  document.getElementById('startBtn').classList.add('idle-pulse');
+  const nxt = document.getElementById('nextLbl');
+  if (nxt) nxt.textContent = 'NEXT: ' + modeLabels[getNextMode(m)];
+  
+  updateStartBtnUI();
+  
   updateDisp(); updateRing();
   if (autoStart) {
     document.getElementById('statusTxt').textContent = 'AUTO-STARTING...';
-    setTimeout(startTimer, 400);
+    setTimeout(() => {
+      hasStartedCurrentSession = true;
+      startTimer();
+    }, 400);
+  } else {
+    document.getElementById('statusTxt').textContent = 'READY';
+  }
+}
+
+function updateStartBtnUI() {
+  const container = document.getElementById('startActionContainer');
+  if (!container) return;
+  if (!hasStartedCurrentSession) {
+    const modeAction = mode === 'focus' ? 'START FOCUS' : 'START BREAK';
+    const color = mode === 'focus' ? '#f0a0c8' : (mode === 'short' ? '#a0c0f8' : '#c0a0f8');
+    container.innerHTML = `
+      <div style="font-size: 28px; color: ${color}; line-height: 1; margin-bottom: 2px; filter: drop-shadow(2px 2px 0 var(--lavender));">▶</div>
+      <div class="idle-pulse" style="font-family: 'VT323', monospace; font-size: 15px; font-weight: bold; color: ${color}; letter-spacing: 1.5px;">${modeAction}</div>
+    `;
+  } else {
+    const txt = running ? 'PAUSE' : 'RESUME';
+    const clz = running ? '' : 'idle-pulse';
+    container.innerHTML = `
+      <div class="${clz}" style="font-family: 'VT323', monospace; font-size: 14px; color: var(--muted); letter-spacing: 2px; margin-top: 14px;">${txt}</div>
+    `;
   }
 }
 
@@ -230,8 +258,6 @@ function tickTimer() {
     clearInterval(iv);
     iv = null;
     running = false;
-    document.getElementById('startBtn').textContent = 'START';
-    document.getElementById('startBtn').classList.add('idle-pulse');
     onEnd();
     return;
   }
@@ -248,8 +274,7 @@ function startTimer() {
   if (!timerEnd) {
     timerEnd = Date.now() + secsLeft * 1000;
   }
-  document.getElementById('startBtn').textContent = 'PAUSE';
-  document.getElementById('startBtn').classList.remove('idle-pulse');
+  updateStartBtnUI();
   document.getElementById('statusTxt').textContent = 'RUNNING...';
   tickTimer();
   iv = setInterval(tickTimer, 250);
@@ -257,13 +282,16 @@ function startTimer() {
 
 function handleStart() {
   ensureAudio();
-  if (running) {
+  stopSound();
+  if (!hasStartedCurrentSession) {
+    hasStartedCurrentSession = true;
+    startTimer();
+  } else if (running) {
     clearInterval(iv);
     iv = null;
     timerEnd = null;
     running = false;
-    document.getElementById('startBtn').textContent = 'START';
-    document.getElementById('startBtn').classList.add('idle-pulse');
+    updateStartBtnUI();
     document.getElementById('statusTxt').textContent = 'PAUSED';
   } else {
     startTimer();
@@ -297,11 +325,13 @@ async function onEnd() {
     updateDots();
   }
   pendingNextMode = getNextMode(mode);
-  document.getElementById('alarmBar').textContent =
-    '★ ' + modeLabels[mode] + ' DONE! CLICK → START ' + modeLabels[pendingNextMode] + ' ★';
-  document.getElementById('alarmBar').classList.add('on');
+  
   playLoop();
-  document.getElementById('statusTxt').textContent = '★ CLICK BANNER TO CONTINUE ★';
+  document.getElementById('statusTxt').textContent = '★ SESSION COMPLETE ★';
+  
+  hasStartedCurrentSession = false;
+  // Auto switch mode, wait for user to start it manually
+  setMode(pendingNextMode, false);
 }
 
 function addHistoryLocal(item) {
@@ -312,18 +342,14 @@ function addHistoryLocal(item) {
 }
 
 function renderHistory() {
-  const summaryEl = document.getElementById('historySummary');
-  const listEl = document.getElementById('historyList');
-  if (!summaryEl || !listEl) return;
+  const listEl = document.getElementById('analyticsHistoryList');
+  if (!listEl) return;
 
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   let items = useFirebase ? historyDocs : (JSON.parse(localStorage.getItem('pomo_history')) || []);
   
   items = items.filter(i => i.timestamp >= sevenDaysAgo);
   items.sort((a, b) => b.timestamp - a.timestamp);
-
-  let totalMins = items.reduce((acc, curr) => acc + (curr.durationMinutes || 0), 0);
-  summaryEl.textContent = `7-DAY: ${items.length} SESSIONS (${totalMins} MINS)`;
 
   if (items.length === 0) {
     listEl.innerHTML = '<div class="todo-empty">NO HISTORY YET ★</div>';
@@ -340,32 +366,28 @@ function renderHistory() {
     el.className = 'todo-item'; 
     el.style.cursor = 'default';
     el.innerHTML = `
-      <div class="todo-txt" style="font-size: 15px; display: flex; justify-content: space-between;">
-        <span>${item.mode.toUpperCase()} - ${item.durationMinutes}M</span>
-        <span style="color: var(--muted);">${dateStr} ${timeStr}</span>
+      <div style="flex: 1; display: flex; flex-direction: column;">
+        <span class="todo-txt" style="font-weight: bold; font-size: 15px;">
+          ${item.mode === 'focus' ? 'Focus Session Completed' : (item.mode === 'short' ? 'Short Break' : 'Long Break')}
+        </span>
+        <span style="font-size: 12px; color: var(--muted);">${dateStr}, ${timeStr}</span>
+      </div>
+      <div style="font-weight: bold; color: var(--pink); font-size: 16px; font-family: 'VT323', monospace;">
+        ${item.durationMinutes} min
       </div>
     `;
     listEl.appendChild(el);
   });
 }
 
-function stopAlarmAndNext() {
-  stopSound();
-  document.getElementById('alarmBar').classList.remove('on');
-  const next = pendingNextMode || 'focus';
-  pendingNextMode = null;
-  setMode(next, true);
-}
-
 function handleReset() {
   ensureAudio();
   clearInterval(iv); iv = null; timerEnd = null;
   stopSound(); running = false;
-  document.getElementById('startBtn').textContent = 'START';
-  document.getElementById('startBtn').classList.add('idle-pulse');
-  document.getElementById('alarmBar').classList.remove('on');
+  hasStartedCurrentSession = false;
   pendingNextMode = null;
   secsLeft = totalSecs; updateDisp(); updateRing();
+  updateStartBtnUI();
   document.getElementById('statusTxt').textContent = 'READY';
 }
 
@@ -373,9 +395,6 @@ function handleSkip() {
   ensureAudio();
   clearInterval(iv); iv = null; timerEnd = null;
   stopSound(); running = false;
-  document.getElementById('startBtn').textContent = 'START';
-  document.getElementById('startBtn').classList.add('idle-pulse');
-  document.getElementById('alarmBar').classList.remove('on');
   if (mode === 'focus') {
     sessions = Math.min(sessions + 1, 4);
     localStorage.setItem('pomo_sessions', sessions);
@@ -383,7 +402,7 @@ function handleSkip() {
   }
   const next = getNextMode(mode);
   pendingNextMode = null;
-  setMode(next, true);
+  setMode(next, false);
 }
 
 function updateDots() {
@@ -607,7 +626,7 @@ async function togglePiP() {
 }
 
 window.addEventListener('load', () => {
-  document.getElementById('startBtn')?.classList.add('idle-pulse');
+  updateStartBtnUI();
   const inpFocus = document.getElementById('inp-focus');
   if (inpFocus) {
     inpFocus.value = CFG.focus;
@@ -620,6 +639,43 @@ window.addEventListener('load', () => {
   renderHistory();
 });
 
+function openPresets() {
+  document.getElementById('modalsContainer').style.display = 'flex';
+  document.getElementById('presetsModal').style.display = 'block';
+  document.getElementById('analyticsModal').style.display = 'none';
+}
+
+function openAnalytics() {
+  document.getElementById('modalsContainer').style.display = 'flex';
+  document.getElementById('analyticsModal').style.display = 'block';
+  document.getElementById('presetsModal').style.display = 'none';
+  renderHistory();
+}
+
+function closeModals() {
+  document.getElementById('modalsContainer').style.display = 'none';
+  document.getElementById('presetsModal').style.display = 'none';
+  document.getElementById('analyticsModal').style.display = 'none';
+}
+
+function applyPreset(name, focus, short, long) {
+  CFG.focus = focus;
+  CFG.short = short;
+  CFG.long = long;
+  localStorage.setItem('pomo_cfg', JSON.stringify(CFG));
+  
+  if (document.getElementById('inp-focus')) {
+    document.getElementById('inp-focus').value = focus;
+    document.getElementById('inp-short').value = short;
+    document.getElementById('inp-long').value = long;
+  }
+  
+  hasStartedCurrentSession = false;
+  setMode('focus', false);
+  closeModals();
+  document.getElementById('statusTxt').textContent = name + ' PRESET APPLIED!';
+}
+
 // Expose globals for index.html inline event handlers
 window.togglePiP = togglePiP;
 window.setMode = setMode;
@@ -627,4 +683,7 @@ window.handleReset = handleReset;
 window.handleStart = handleStart;
 window.handleSkip = handleSkip;
 window.applyCustom = applyCustom;
-window.stopAlarmAndNext = stopAlarmAndNext;
+window.openPresets = openPresets;
+window.openAnalytics = openAnalytics;
+window.closeModals = closeModals;
+window.applyPreset = applyPreset;

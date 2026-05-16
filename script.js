@@ -1,6 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 import { firebaseConfig } from './firebase-config.js';
 
@@ -12,22 +12,58 @@ try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  
-  signInAnonymously(auth).catch((error) => {
-    console.error("Firebase Anonymous Auth failed:", error);
-    useFirebase = false;
-  });
 
   onAuthStateChanged(auth, (user) => {
+    const loginScreen = document.getElementById('loginScreen');
+    const mainApp = document.getElementById('mainApp');
+
     if (user) {
       uid = user.uid;
       useFirebase = true;
+      if (loginScreen) loginScreen.style.display = 'none';
+      if (mainApp) mainApp.style.display = 'flex';
+      
+      const statusEl = document.getElementById('statusTxt');
+      if (statusEl) statusEl.textContent = `LOGGED IN AS: ${user.email}`;
+
       setupRealtimeTodos();
     } else {
       uid = null;
       useFirebase = false;
+      if (loginScreen) loginScreen.style.display = 'block';
+      if (mainApp) mainApp.style.display = 'none';
     }
   });
+
+  const signInBtn = document.getElementById('signInBtn');
+  if (signInBtn) {
+    signInBtn.addEventListener('click', async () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errorDiv = document.getElementById('authError');
+      errorDiv.textContent = "";
+
+      if (!email || !password) {
+        errorDiv.textContent = "⚠️ INPUTS CANNOT BE EMPTY";
+        return;
+      }
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (loginError) {
+        if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
+          try {
+            await createUserWithEmailAndPassword(auth, email, password);
+          } catch (registerError) {
+            errorDiv.textContent = `⚠️ ${registerError.message.replace("Firebase: ", "")}`;
+          }
+        } else {
+          errorDiv.textContent = `⚠️ ${loginError.message.replace("Firebase: ", "")}`;
+        }
+      }
+    });
+  }
+
 } catch (e) {
   console.error("Firebase init failed. Falling back to localStorage.", e);
   useFirebase = false;

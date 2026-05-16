@@ -83,7 +83,6 @@ let alarmIv = null;
 let alarmNodes = [];
 let todos = JSON.parse(localStorage.getItem('pomo_todos')) || [];
 let todoId = todos.length > 0 ? Math.max(...todos.map(t => typeof t.id === 'number' ? t.id : 0)) + 1 : 0;
-let activeTodoId = null;
 let pendingNextMode = null;
 let audioCtx = null;
 let audioUnlocked = false;

@@ -2,11 +2,9 @@
 ### `README.md`
 
 ```markdown
-# P0M0D0R0.EXE ★ Y2K Edition
+# P0M0D0R0.EXE ★
 
 A vibrant, vaporwave-infused retro Pomodoro desktop application designed with a classic Y2K window aesthetic. This application merges hyper-stylized pixel interfaces with robust modern task management, localized tracking, and real-time cloud data synchronization.
-
-![Aesthetic Shield](https://img.shields.io/badge/Aesthetic-Y2K%20%2F%20Vaporwave-ff69b4) ![Deployment Status](https://img.shields.io/badge/Deployment-Vercel-black)
 
 ---
 
@@ -130,6 +128,4 @@ vercel
 
 Follow the interactive setup prompts to link and deploy your static build target directly into production.
 
-```
 
-```

@@ -9,7 +9,20 @@
 </head>
 <body>
 
-<div class="wrap">
+<div class="panel timer-panel" id="loginScreen" style="max-width: 320px; margin: 5rem auto; padding: 20px; text-align: center;">
+  <div class="win-bar">
+    <span class="win-title">★ AUTHENTICATION.EXE</span>
+  </div>
+  <div class="timer-body" style="gap: 12px; margin-top: 15px;">
+    <div class="custom-title">✦ PLEASE SIGN IN TO CONTINUE</div>
+    <input class="todo-inp" type="email" id="loginEmail" placeholder="EMAIL ADDRESS...">
+    <input class="todo-inp" type="password" id="loginPassword" placeholder="PASSWORD...">
+    <button class="btn primary" id="signInBtn">SIGN IN / REGISTER</button>
+    <div class="stxt" id="authError" style="color: #c04080; margin-top: 5px;"></div>
+  </div>
+</div>
+
+<div class="wrap" id="mainApp" style="display: none;">
   <!-- TIMER PANEL -->
   <div class="panel timer-panel">
     <div class="win-bar">
@@ -119,11 +132,67 @@
   import { firebaseConfig } from './firebase-config.js';
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 
+  import { 
+    getAuth, 
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    onAuthStateChanged 
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   if (app) {
     console.log("Firebase successfully initialized!", app.name);
   }
+
+  // 2. Initialize Auth service instance
+  const auth = getAuth(app);
+
+  // 3. Monitor user login state dynamically
+  onAuthStateChanged(auth, (user) => {
+    const loginScreen = document.getElementById('loginScreen');
+    const mainApp = document.getElementById('mainApp');
+
+    if (user) {
+      // User is signed in -> Hide login box and reveal your Pomodoro dashboard
+      loginScreen.style.display = 'none';
+      mainApp.style.display = 'flex';
+      document.getElementById('statusTxt').textContent = `LOGGED IN AS: ${user.email}`;
+    } else {
+      // No user signed in -> Keep application interface locked away
+      loginScreen.style.display = 'block';
+      mainApp.style.display = 'none';
+    }
+  });
+
+  // 4. Handle button interactions (Attempts login; falls back to registration if account is new)
+  document.getElementById('signInBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorDiv = document.getElementById('authError');
+    errorDiv.textContent = ""; // Clear existing log paths
+
+    if (!email || !password) {
+      errorDiv.textContent = "⚠️ INPUTS CANNOT BE EMPTY";
+      return;
+    }
+
+    try {
+      // Attempt signing in an existing profile
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (loginError) {
+      // If user account is not found, attempt creating a fresh profile automatically
+      if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
+        try {
+          await createUserWithEmailAndPassword(auth, email, password);
+        } catch (registerError) {
+          errorDiv.textContent = `⚠️ ${registerError.message.replace("Firebase: ", "")}`;
+        }
+      } else {
+        errorDiv.textContent = `⚠️ ${loginError.message.replace("Firebase: ", "")}`;
+      }
+    }
+  });
 </script>
 <script type="module" src="script.js"></script>
 </body>

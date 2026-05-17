@@ -1,67 +1,56 @@
-
 ### `README.md`
 
 ```markdown
 # P0M0D0R0.EXE ★
 
-A vibrant, vaporwave-infused retro Pomodoro desktop application designed with a classic Y2K window aesthetic. This application merges hyper-stylized pixel interfaces with robust modern task management, localized tracking, and real-time cloud data synchronization.
+A vibrant, vaporwave-infused retro Pomodoro application designed with a classic Y2K window aesthetic. It blends a hyper-stylized pixel interface with robust modern task management, academic tracking, and real-time cloud synchronization.
 
 ---
 
 ## ★ KEY FEATURES
 
-* **Retro Authentication Layer (`★ AUTHENTICATION.EXE`)**
-    * Secure user gating powered by Firebase Auth.
-    * Intelligent auto-account generation: signs users in if credentials match or registers a brand new account seamlessly if the credential handles are fresh.
+### 💾 Core Engine & Auth
+* **★ AUTHENTICATION.EXE:** Secure user entry powered by Firebase Auth. It features intelligent auto-account generation (seamlessly signs in existing users or registers a fresh profile).
+* **★ P0M0D0R0.EXE:** A dynamic tri-mode timer shifting between **Focus** (25m), **Short Break** (5m), and **Long Break** (15m). Operates on an automated sequence routing that rings a sound alert and chains to the next logical block (e.g., auto-triggering a long break after 4 focus rounds).
+* **★ MINI-PLAYER (PiP):** Supports an independent, always-on-top Picture-in-Picture window. Uses an HTML5 Canvas stream to mirror live countdowns directly on top of your screen while you browse other tabs.
 
-* **Dynamic Tri-Mode Pomodoro Engine (`★ P0M0D0R0.EXE`)**
-    * Pre-configured operational cycles: **Focus Time** (25 mins), **Short Break** (5 mins), and **Long Break** (15 mins).
-    * Automated sequence routing that ticks down, rings an alert, and stages the next logical block (e.g., automatically pivoting to a Long Break after completing 4 continuous Focus cycles).
-    * Highly customizable parameters allowing on-the-fly threshold adjustments saved instantly across sessions.
+### 🎧 Ambient Audio Matrix
+* **Synth Wave Alarm:** Custom synthesized square-wave frequencies triggered natively via the Web Audio API to bypass restrictive browser autoplay rules.
+* **Atmospheric Noise:** Immersive background options including **Heavy Rain**, **Ocean Waves**, and a dedicated **40Hz Gamma Focus Tone** with anti-pop audio fade curves.
 
-* **Picture-in-Picture Mini-Player Mode (PiP)**
-    * Pop open an independent, always-on-top micro visual canvas.
-    * Utilizes HTML5 Canvas capture tracking to render live countdown updates directly inside a system-level floating PiP window while you browse other screens.
+### 📚 Unified Academic Hub
+* **Homework Manager (`★ SUBMISSIONS.EXE`):** Comprehensive assignment logs complete with due dates, customizable sub-task checklists, markdown text spaces for notes/links, and a confetti particle payoff upon completion.
+* **Exam Tracker (`★ EXAM_COUNTDOWN.EXE`):** Chronological test milestones with urgency status badges (`🚨 TODAY!!!`, `⚠️ DAYS LEFT`, or `PASSED`). Includes internal study-topic checkmarks to monitor overall mastery percentage.
+* **Task Manager (`★ TODO_LIST.EXE`):** Standard interactive daily responsibilities checklist with a quick-clean script (`🧹 CLEAN COMPLETED`) to sweep away checked entries.
 
-* **Real-time Task Manager (`★ TODO_LIST.EXE`)**
-    * Interactive checklist infrastructure allowing CRUD capabilities (Create, Read, Update, Delete) for daily responsibilities.
-    * Instant toggle markings with visual strikethrough updates.
-
-* **Urgency Metric Tracker (`★ EXAM_COUNTDOWN.EXE`)**
-    * Custom exam and target-date logger designed for students and professionals.
-    * Chronological milestone sorting featuring contextual warning banners (e.g., highlights imminent targets when less than 3 days remain or alerts you with a blinking `🚨 TODAY!!!` indicator).
-
-* **Historical Productivity Logger (`★ HISTORY.EXE`)**
-    * A rolling 7-day productivity analytical audit board.
-    * Automatically tallies completed sessions and raw accumulated operational minutes over a week-long time horizon.
-
-* **Synth Sound System Engine**
-    * Custom synthesized synth square-wave multi-frequency loops triggered natively through the browser Web Audio API.
-    * Bypasses aggressive web-browser audio autoplay restrictions via intuitive initial tap gestures.
+### 📊 System Operations & Stats
+* **Subject Folders (`★ SUBJECTS.CFG`):** Organize your tracking dashboard by semester (Sem 5-9) with specialized custom color-picking nodes that cascade instantly across your entire UI.
+* **Agenda Calendar (`★ CALENDAR.EXE`):** Interactive calendar matrix showing daily bullet nodes color-coded by subject alongside a chronological agenda sidebar for any selected date.
+* **Productivity Feed (`★ HISTORY.EXE`):** A rolling 7-day performance auditor summarizing active session history and charting focus minutes across a clean bar graph.
 
 ---
 
 ## ★ THE TECH STACK
 
-* **Frontend Architecture:** Vanilla ECMAScript Modules (JavaScript ES6+), HTML5 Semantic Shell, CSS3 Flexbox/Grid Layout Systems.
-* **Database & Security Cloud Layer:** Google Firebase Ecosystem
-    * **Firebase Authentication:** Handles secure, isolated user authentication profiles.
-    * **Cloud Firestore:** Real-time NoSQL data synchronization pipelines utilizing live `onSnapshot` streaming collections organized cleanly under individual user data endpoints (`users/{uid}/*`).
-* **State Redundancy Storage:** Browser Web Storage API (`localStorage`) fallback structures to secure state durability during connection drops or isolated offline runtime modes.
-* **Typography Rendering:** Google Fonts CDN integration serving pixel-art monospaced typography variants (`VT323` & `Orbitron`).
-* **Hosting Framework:** Vercel Cloud Platform for instant serverless deployments and fast loading speeds.
+* **Frontend Architecture:** Vanilla JavaScript (ES6+ Modules), HTML5 Semantic Shell, CSS3 Flexbox/Grid Systems.
+* **Cloud Layer:** Google Firebase Ecosystem (Firebase Auth & Cloud Firestore real-time `onSnapshot` streaming pipelines).
+* **Local Redundancy:** Browser `localStorage` fallbacks to preserve configurations and state during network drops.
+* **Visual FX & Typography:** Canvas Confetti engine for achievement rewards; Google Fonts CDN monospaced families (`VT323` & `Orbitron`).
+* **Hosting Platform:** Vercel Cloud Platform for instant, serverless global distribution.
 
 ---
 
 ## ★ FILE ARCHITECTURE
 
 ```text
-├── .vscode/
-│   └── launch.json         # Local browser debugging environment profile
-├── .gitignore              # Local build artifacts and sensitive credentials mask
-├── index.html              # Main GUI structure & layout panels
-├── script.js               # Application coordinator, logic engine & cloud synchronization
-└── styles.css              # Custom Y2K layout animations, tokens & thematic palettes
+├── .github/workflows/static.yml   # Automated GitHub Pages static content deployment
+├── .vscode/launch.json            # Automated local browser debugging profile
+├── .gitignore                     # Secure protection masking local cloud credentials
+├── index.html                     # Core application layout panels and window shells
+├── script.js                      # Central app coordinator, state machine, and audio nodes
+├── tasks.js                       # Operational modules for todos, exams, homework, and modals
+├── calendar.js                    # Matrix engines generating the grid UI and daily agendas
+└── styles.css                     # Vaporwave color variables, keyframes, and scrollbars
 
 ```
 
@@ -69,23 +58,19 @@ A vibrant, vaporwave-infused retro Pomodoro desktop application designed with a 
 
 ## ★ CONFIGURATION & LOCAL DEVELOPMENT
 
-### Prerequisites
+### 1. Clone the Workspace
 
-To hook into real-time persistence, ensure you have a Firebase project provisioned.
-
-### Local Initialization
-
-1. Clone this repository locally into your working workspace:
 ```bash
 git clone [https://github.com/your-username/pomodoro-sofia.git](https://github.com/your-username/pomodoro-sofia.git)
 cd pomodoro-sofia
 
 ```
 
+### 2. Configure Environment Credentials
 
-2. Create your local config file. Create a file named `firebase-config.js` right in the root directory:
+Create a file named `firebase-config.js` right in the project root directory:
+
 ```javascript
-// firebase-config.js
 export const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_AUTH_DOMAIN",
@@ -97,35 +82,32 @@ export const firebaseConfig = {
 
 ```
 
+*(Note: `firebase-config.js` is automatically blocked by `.gitignore` to prevent leaking private cloud tokens).*
 
-*(Note: `firebase-config.js` and `.vercel` directories are automatically untracked by Git to protect your cloud keys and deployment environments).*
-3. Open up your preferred development server environment (like VS Code's Live Server extension) or open `index.html` through the automated runtime profile configurations structured inside `.vscode/launch.json`.
+### 3. Launch Locally
+
+Run your favorite web daemon (like VS Code's **Live Server** extension) or use the pre-configured runtime profile inside `.vscode/launch.json`.
 
 ---
 
-## ★ VERCEL PRODUCTION DEPLOYMENT
+## ★ PRODUCTION DEPLOYMENT
 
-This project is built to deploy seamlessly to Vercel via Git Integration or the Vercel CLI.
+### Option A: Automatic Git Sync (Recommended)
 
-### Option 1: Automatic Git Deploy (Recommended)
+1. Commit and push your workspace changes to your personal GitHub repository.
+2. Link your repository directly inside the **Vercel Dashboard**.
+3. Head to your **Vercel Project Settings > Environment Variables** to map configuration keys if utilizing custom pipelines.
 
-1. Push your code repository to GitHub, GitLab, or Bitbucket.
-2. Link your repository inside the **Vercel Dashboard**.
-3. Since `firebase-config.js` is ignored by Git to keep it secure, go to your **Vercel Project Settings > Environment Variables** and add your configuration details there if using a build system, or use Option 2 below for clean static file handling via CLI.
+### Option B: Vercel CLI Upload
 
-### Option 2: Deploying via Vercel CLI
-
-If you prefer straight-to-cloud deployments while maintaining local config files:
+For immediate cloud deployment straight from your local shell terminal:
 
 ```bash
-# Install Vercel CLI globally if you haven't already
-npm install -g vercel
-
-# Authenticate and deploy directly from your project directory
-vercel
+npm install -g vercel   # Install tool globally
+vercel                  # Trigger interactive upload deployment
 
 ```
 
-Follow the interactive setup prompts to link and deploy your static build target directly into production.
+```
 
-
+```

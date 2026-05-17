@@ -4,8 +4,13 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, on
 
 import { firebaseConfig } from './firebase-config.js';
 
-import { renderTodos, renderExams, renderHomework, renderSubjects } from './tasks.js';
+import { renderTodos } from './todos.js';
+import { renderExams } from './exams.js';
+import { renderHomework } from './homework.js';
+import { renderSubjects } from './subjects.js';
+import { renderSchedule } from './schedule.js';
 import './calendar.js';
+import './dashboard.js';
 
 export let app, auth, db;
 export let currentUser = null;
@@ -46,6 +51,18 @@ try {
           if (statusEl) statusEl.textContent = `WELCOME BACK, ${userName}!`;
           if (greetEl) greetEl.textContent = `★ HELLO, ${userName}! ★`;
         }
+        if (userDocSnap.exists() && userDocSnap.data().petIndex) {
+          if (window.selectPet) window.selectPet(userDocSnap.data().petIndex, false);
+        }
+
+        const settingsRef = doc(db, "users", user.uid, "settings", "timetable");
+        const settingsSnap = await getDoc(settingsRef);
+        if (settingsSnap.exists() && settingsSnap.data().image) {
+          window.currentScheduleImage = settingsSnap.data().image;
+        } else {
+          window.currentScheduleImage = null;
+        }
+        if (window.renderScheduleImage) window.renderScheduleImage();
       } catch (err) {
         console.error("Error loading individualized profile name:", err);
       }
@@ -54,6 +71,7 @@ try {
       syncData('exams', collection(db, "users", user.uid, "exams"), renderExams);
       syncData('homework', collection(db, "users", user.uid, "homework"), renderHomework);
       syncData('subjects', collection(db, "users", user.uid, "subjects"), renderSubjects);
+      syncData('schedule', collection(db, "users", user.uid, "schedule"), renderSchedule);
       setupRealtimeHistory();
     } else {
       currentUser = null;
@@ -68,6 +86,9 @@ try {
       document.getElementById('examList').innerHTML = "";
       document.getElementById('hwList').innerHTML = "";
       if(document.getElementById('subjectList')) document.getElementById('subjectList').innerHTML = "";
+      if(document.getElementById('scheduleList')) document.getElementById('scheduleList').innerHTML = "";
+      window.currentScheduleImage = null;
+      if (window.renderScheduleImage) window.renderScheduleImage();
       renderHistory();
     }
   });
@@ -280,7 +301,7 @@ function ensureAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    audioCtx.resume().catch(e => console.warn(e));
   }
   if (!audioUnlocked) {
     const buf = audioCtx.createBuffer(1, 1, 22050);
@@ -299,25 +320,36 @@ function ensureAudio() {
 }
 
 function playLoop() {
+  ensureAudio();
   stopSound();
   function beep() {
     if (!audioCtx) return;
-    const freqs = [523, 659, 784, 659];
-    freqs.forEach((f, i) => {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.connect(g);
-      g.connect(audioCtx.destination);
-      o.type = 'square';
-      o.frequency.value = f;
-      const t = audioCtx.currentTime + i * 0.18;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.12, t + 0.02);
-      g.gain.linearRampToValueAtTime(0, t + 0.16);
-      o.start(t);
-      o.stop(t + 0.2);
-      alarmNodes.push(o);
-    });
+    
+    const scheduleNotes = () => {
+      const freqs = [523, 659, 784, 659];
+      const now = audioCtx.currentTime;
+      freqs.forEach((f, i) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.type = 'square';
+        o.frequency.value = f;
+        const t = now + i * 0.18 + 0.05;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.12, t + 0.02);
+        g.gain.linearRampToValueAtTime(0, t + 0.16);
+        o.start(t);
+        o.stop(t + 0.2);
+        alarmNodes.push(o);
+      });
+    };
+
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(scheduleNotes).catch(e => console.warn('Audio wake failed', e));
+    } else {
+      scheduleNotes();
+    }
   }
   beep();
   alarmIv = setInterval(beep, 900);
@@ -347,7 +379,7 @@ function setMode(m, autoStart) {
   document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + m).classList.add('active');
   document.getElementById('timeDisp').className = 'time-disp ' + modeColors[m];
-  document.getElementById('ring').className = 'ring-fill ' + modeColors[m];
+  document.getElementById('ring').setAttribute('class', 'ring-fill ' + modeColors[m]);
   document.getElementById('modeLbl').textContent = modeLabels[m];
   const nxt = document.getElementById('nextLbl');
   if (nxt) nxt.textContent = 'NEXT: ' + modeLabels[getNextMode(m)];
@@ -756,11 +788,17 @@ async function togglePiP() {
   }
 }
 
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+});
+
 window.addEventListener('load', () => {
   updateStartBtnUI();
 
   // Init Desktop Pet
-  if (window.selectPet) window.selectPet(currentPetIndex);
+  if (window.selectPet) window.selectPet(currentPetIndex, false);
 
   // Auto-fill dates
   const todayStr = new Date().toISOString().split('T')[0];
@@ -781,6 +819,10 @@ window.addEventListener('load', () => {
   updateRing();
   updateDots();
   renderHistory();
+  if (!window.useFirebase) {
+    window.currentScheduleImage = localStorage.getItem('pomo_timetable_image');
+    if (window.renderScheduleImage) window.renderScheduleImage();
+  }
 });
 
 window.exportUserDataToFile = async () => {
@@ -794,6 +836,7 @@ window.exportUserDataToFile = async () => {
     exams: window.currentExams || [],
     homework: window.currentHomework || [],
     subjects: window.currentSubjects || [],
+    schedule: window.currentSchedule || [],
     history: historyDocs.length ? historyDocs : (JSON.parse(localStorage.getItem('pomo_history')) || [])
   };
   
@@ -842,7 +885,8 @@ window.importUserDataFromFile = async (event) => {
          const eAdd = await restoreCol('exams', data.exams || []);
          const hAdd = await restoreCol('homework', data.homework || []);
          const sAdd = await restoreCol('subjects', data.subjects || []);
-         await window.customAlert(`★ CLOUD SYNC MERGE COMPLETE! ★<br>Added missing items: ${tAdd} Todos, ${eAdd} Exams, ${hAdd} HW, ${sAdd} Subjects.`);
+         const schAdd = await restoreCol('schedule', data.schedule || []);
+         await window.customAlert(`★ CLOUD SYNC MERGE COMPLETE! ★<br>Added missing items: ${tAdd} Todos, ${eAdd} Exams, ${hAdd} HW, ${sAdd} Subjects, ${schAdd} Schedule.`);
       } else {
          const mergeLocal = (key, items) => {
              const local = JSON.parse(localStorage.getItem(key)) || [];
@@ -858,8 +902,9 @@ window.importUserDataFromFile = async (event) => {
          const eAdd = mergeLocal('pomo_exams', data.exams || []);
          const hAdd = mergeLocal('pomo_homework', data.homework || []);
          const sAdd = mergeLocal('pomo_subjects', data.subjects || []);
+         const schAdd = mergeLocal('pomo_schedule', data.schedule || []);
          mergeLocal('pomo_history', data.history || []);
-         await window.customAlert(`★ LOCAL DATA MERGED! ★<br>Added missing items: ${tAdd} Todos, ${eAdd} Exams, ${hAdd} HW, ${sAdd} Subjects.`);
+         await window.customAlert(`★ LOCAL DATA MERGED! ★<br>Added missing items: ${tAdd} Todos, ${eAdd} Exams, ${hAdd} HW, ${sAdd} Subjects, ${schAdd} Schedule.`);
          window.location.reload(); 
       }
     } catch (err) {
@@ -883,6 +928,12 @@ function openAnalytics() {
   renderHistory();
 }
 
+window.openSchedule = () => {
+  closeModals();
+  document.getElementById('modalsContainer').style.display = 'flex';
+  document.getElementById('scheduleModal').style.display = 'flex';
+};
+
 function openSubjects() {
   closeModals();
   document.getElementById('modalsContainer').style.display = 'flex';
@@ -897,10 +948,21 @@ function closeModals() {
   document.getElementById('hwModal').style.display = 'none';
   const cm = document.getElementById('calendarModal');
   if (cm) cm.style.display = 'none';
+  const sm = document.getElementById('scheduleModal');
+  if (sm) sm.style.display = 'none';
   document.getElementById('subjectModal').style.display = 'none';
   document.getElementById('profileModal').style.display = 'none';
   document.getElementById('subjectOverviewModal').style.display = 'none';
+  const atm = document.getElementById('allTasksModal');
+  if (atm) atm.style.display = 'none';
 }
+
+window.togglePanel = (id) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.display = (el.style.display === 'none') ? 'flex' : 'none';
+  }
+};
 
 function applyPreset(name, focus, short, long) {
   CFG.focus = focus;
@@ -1007,7 +1069,7 @@ window.closeModals = closeModals;
 window.applyPreset = applyPreset;
 
 let currentPetIndex = parseInt(localStorage.getItem('pomo_pet_idx')) || 1;
-window.selectPet = (idx) => {
+window.selectPet = async (idx, sync = true) => {
   currentPetIndex = idx;
   localStorage.setItem('pomo_pet_idx', currentPetIndex);
   
@@ -1022,6 +1084,12 @@ window.selectPet = (idx) => {
       el.style.background = (i === idx) ? 'var(--lavender)' : 'var(--surface)';
       el.style.boxShadow = (i === idx) ? 'inset 2px 2px 0 rgba(255,255,255,0.5)' : 'none';
     }
+  }
+
+  if (sync && window.useFirebase && window.currentUser) {
+    try {
+      await setDoc(doc(db, "users", currentUser.uid), { petIndex: currentPetIndex }, { merge: true });
+    } catch(e) { console.warn("Failed to sync pet:", e); }
   }
 };
 

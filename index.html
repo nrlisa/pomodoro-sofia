@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>P0M0D0R0.EXE ★ Y2K Edition</title>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>★</text></svg>">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 </head>
@@ -35,15 +36,37 @@
     
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Stats & History" onclick="openAnalytics()">📊<span style="font-size: 10px; font-weight: bold;">STATS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Manage Subjects" onclick="openSubjects()">📚<span style="font-size: 10px; font-weight: bold;">SUBJECTS</span></button>
+    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="All Tasks Overview" onclick="openAllTasks()">📋<span style="font-size: 10px; font-weight: bold;">TASKS</span></button>
+    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Weekly Timetable" onclick="openSchedule()">📅<span style="font-size: 10px; font-weight: bold;">SCHED</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="View Profile" onclick="openProfile()">👤<span style="font-size: 10px; font-weight: bold;">PROFILE</span></button>
-    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Export DAT Backup" onclick="exportUserDataToFile()">💾<span style="font-size: 10px; font-weight: bold;">EXPORT</span></button>
-    <label class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0;" title="Import DAT Backup">📂<span style="font-size: 10px; font-weight: bold;">IMPORT</span><input type="file" style="display:none;" onchange="importUserDataFromFile(event)" accept=".dat,.json"></label>
     
     <div class="dock-divider" style="width: 40px; border-bottom: 2px dashed var(--border); margin: 4px 0;"></div>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Sign Out" onclick="handleSignOut()">🚪<span style="font-size: 10px; font-weight: bold;">LOGOUT</span></button>
   </div>
 
   <div class="col-left">
+    <!-- TODAY'S SCHEDULE -->
+    <div class="panel" id="panel-schedule" style="width: 100%; display: flex; flex-direction: column; margin-bottom: 16px;">
+      <div class="win-bar" style="background: var(--mint);">
+        <span class="win-title">★ TODAY_SCHEDULE.EXE</span>
+        <div class="win-btns">
+          <button class="wbtn" onclick="togglePanel('todaySchedContent')" title="Minimize Window">_</button>
+          <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">□</div>
+          <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">×</div>
+        </div>
+      </div>
+      <div id="todaySchedContent" style="padding: 12px; display: flex; flex-direction: column; background: var(--surface);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
+          <button class="wbtn" style="width: 24px; height: 24px; font-size: 14px;" onclick="changeSchedDayOffset(-1)">◀</button>
+          <span id="schedViewDayDisp" style="font-family: 'VT323', monospace; font-size: 15px; font-weight: bold; color: var(--dark); letter-spacing: 1px;">TODAY'S CLASSES</span>
+          <button class="wbtn" style="width: 24px; height: 24px; font-size: 14px;" onclick="changeSchedDayOffset(1)">▶</button>
+        </div>
+        <ul id="todaySchedList" class="todo-list" style="list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;">
+            <div class="todo-empty" style="padding: 10px; opacity: 0.8;">NO CLASSES ★</div>
+        </ul>
+      </div>
+    </div>
+
     <!-- TIMER PANEL -->
     <div class="panel timer-panel" id="panel-timer">
       <div class="win-bar">
@@ -115,7 +138,11 @@
       <canvas id="timerCanvas" width="120" height="120" style="display:none;"></canvas>
       <video id="pipVideo" width="120" height="120" style="display:none;"></video>
 
-      <div class="custom-section">
+      <div style="width: 100%; border-top: 1px solid var(--border); background: var(--bg);">
+        <button onclick="togglePanel('customizeSection')" style="width: 100%; padding: 6px; font-family: 'VT323', monospace; font-size: 14px; font-weight: bold; background: transparent; border: none; color: var(--mid); cursor: pointer; letter-spacing: 1px; transition: color 0.2s;" onmouseover="this.style.color='var(--dark)'" onmouseout="this.style.color='var(--mid)'">▼ TOGGLE SETTINGS & PRESETS ▼</button>
+      </div>
+
+      <div class="custom-section" id="customizeSection" style="display: none; border-top: none; flex-direction: column;">
         <div class="custom-title">✦ CUSTOMIZE TIMES (MIN)</div>
         <div class="custom-grid">
           <div class="custom-item">
@@ -160,11 +187,12 @@
       <div class="win-bar" style="background: var(--blue);">
         <span class="win-title">★ TASKS_OS.EXE</span>
         <div class="win-btns">
-          <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">_</div>
+          <button class="wbtn" onclick="togglePanel('tasksContent')" title="Minimize Window">_</button>
           <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">□</div>
           <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">×</div>
         </div>
       </div>
+      <div id="tasksContent" style="display: flex; flex-direction: column; flex: 1;">
       <div class="mode-tabs" style="border-bottom: 1px solid var(--border);">
         <button class="mtab active" onclick="switchTaskTab('hw')" id="ttab-hw" style="border-right: 1px solid var(--border);">HOMEWORK <span class="tab-badge" id="badge-hw">0</span></button>
         <button class="mtab" onclick="switchTaskTab('exam')" id="ttab-exam" style="border-right: 1px solid var(--border);">EXAMS <span class="tab-badge" id="badge-exam">0</span></button>
@@ -179,6 +207,34 @@
           <input class="todo-inp" type="date" id="hwDateInp" style="flex: 1; padding: 4px;">
           <button class="add-btn" id="addHwBtn" style="padding: 2px 8px; background: var(--blue); box-shadow: none;">ADD</button>
         </div>
+        <div id="hwSummaryBoard" style="display: flex; gap: 6px; margin-bottom: 12px;">
+          <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);">
+            <div style="font-size: 20px; font-weight: bold; color: #4a5568;" id="hwStatNotStarted">0</div>
+            <div style="font-family: 'VT323', monospace; font-size: 11px; color: #4a5568; letter-spacing: 1px;">NOT STARTED</div>
+          </div>
+          <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);">
+            <div style="font-size: 20px; font-weight: bold; color: #2c5282;" id="hwStatOngoing">0</div>
+            <div style="font-family: 'VT323', monospace; font-size: 11px; color: #2c5282; letter-spacing: 1px;">ONGOING</div>
+          </div>
+          <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);">
+            <div style="font-size: 20px; font-weight: bold; color: #1a533c;" id="hwStatComplete">0</div>
+            <div style="font-family: 'VT323', monospace; font-size: 11px; color: #1a533c; letter-spacing: 1px;">COMPLETE</div>
+          </div>
+          <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);">
+            <div style="font-size: 20px; font-weight: bold; color: #742a2a;" id="hwStatOverdue">0</div>
+            <div style="font-family: 'VT323', monospace; font-size: 11px; color: #742a2a; letter-spacing: 1px;">OVERDUE</div>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
+          <div class="custom-title" style="margin-bottom: 0; color: #5070b0;">✦ ASSIGNMENTS</div>
+          <select id="hwFilterSel" class="todo-inp" style="width: auto; padding: 2px 6px; font-size: 14px; height: auto; box-shadow: none;" onchange="window.applyHwFilter()">
+            <option value="all">SHOW: ALL</option>
+            <option value="overdue">SHOW: OVERDUE</option>
+            <option value="ongoing">SHOW: ONGOING</option>
+            <option value="not_started">SHOW: NOT STARTED</option>
+            <option value="complete">SHOW: COMPLETE</option>
+          </select>
+        </div>
         <ul id="hwList" class="todo-list" style="list-style: none; padding: 0; margin: 0; flex: 1;"></ul>
       </div>
 
@@ -189,6 +245,14 @@
           <input class="todo-inp" type="text" id="examNameInp" placeholder="Exam Name..." style="flex: 2;">
           <input class="todo-inp" type="date" id="examDateInp" style="flex: 1; padding: 4px;">
           <button class="add-btn" id="addExamBtn" style="padding: 2px 8px; background: var(--pink); box-shadow: none;">ADD</button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
+          <div class="custom-title" style="margin-bottom: 0; color: #c04080;">✦ EXAM RECORDS</div>
+          <select id="examFilterSel" class="todo-inp" style="width: auto; padding: 2px 6px; font-size: 14px; height: auto; box-shadow: none;" onchange="window.applyExamFilter()">
+            <option value="all">SHOW: ALL</option>
+            <option value="upcoming" selected>SHOW: UPCOMING</option>
+            <option value="passed">SHOW: PAST HISTORY</option>
+          </select>
         </div>
         <ul id="examList" class="todo-list" style="list-style: none; padding: 0; margin: 0; flex: 1;"></ul>
       </div>
@@ -206,19 +270,20 @@
           <button class="btn" style="width: auto; padding: 4px 8px; font-size: 13px; box-shadow: none;" onclick="clearCompletedTodos()">🧹 CLEAN COMPLETED</button>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- CALENDAR SECTION -->
-    <div id="cal-section" class="panel" style="width: 100%; display: flex; flex-direction: column;">
+    <div id="cal-section" class="panel" style="width: 100%; display: flex; flex-direction: column; margin-bottom: 16px;">
       <div class="win-bar" style="background: var(--lavender);">
         <span class="win-title">★ CALENDAR.EXE</span>
         <div class="win-btns">
-          <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">_</div>
+          <button class="wbtn" onclick="togglePanel('calContent')" title="Minimize Window">_</button>
           <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">□</div>
           <div class="wbtn" style="opacity: 0.4; cursor: not-allowed;" title="Decorative Only">×</div>
         </div>
       </div>
-      <div style="padding: 16px; display: flex; flex-direction: column; flex: 1; overflow: hidden; background: var(--surface);">
+      <div id="calContent" style="padding: 16px; display: flex; flex-direction: column; flex: 1; overflow: hidden; background: var(--surface);">
         <div class="cal-header" style="justify-content: center; gap: 20px; margin-bottom: 16px;">
           <button class="wbtn" style="width: 28px; height: 28px; font-size: 16px;" onclick="changeCalMonth(-1)">◀</button>
           <span id="calMonthYear" style="font-size: 20px; text-shadow: 2px 2px 0 var(--lavender); letter-spacing: 2px;">MONTH YYYY</span>
@@ -304,6 +369,37 @@
     </div>
   </div>
 
+  <!-- All Tasks Modal -->
+  <div id="allTasksModal" class="panel" style="display: none; width: 700px; max-width: 95vw; max-height: 90vh; flex-direction: column;">
+    <div class="win-bar" style="background: var(--blue);">
+      <span class="win-title">★ MASTER_TASKS.EXE</span>
+      <div class="win-btns"><button class="wbtn" onclick="closeModals()">×</button></div>
+    </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
+      <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+        <!-- EXAMS -->
+        <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-family: 'VT323', monospace; font-size: 13px; font-weight: bold; color: #c04080; text-align: center; letter-spacing: 1px;">✦ UPCOMING EXAMS</div>
+          <div class="panel" style="padding: 8px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);">
+            <div style="font-size: 24px; font-weight: bold; color: #c04080;" id="mastExamUpcoming">0</div>
+            <div style="font-family: 'VT323', monospace; font-size: 12px; color: var(--muted);">TOTAL UPCOMING</div>
+          </div>
+        </div>
+        <!-- HOMEWORK -->
+        <div style="flex: 2; min-width: 300px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-family: 'VT323', monospace; font-size: 13px; font-weight: bold; color: #5070b0; text-align: center; letter-spacing: 1px;">✦ HOMEWORK PROGRESS</div>
+          <div style="display: flex; gap: 4px;">
+            <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);"><div style="font-size: 20px; font-weight: bold; color: #4a5568;" id="mastHwNotStarted">0</div><div style="font-family: 'VT323', monospace; font-size: 10px; color: #4a5568;">NOT STARTED</div></div>
+            <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);"><div style="font-size: 20px; font-weight: bold; color: #2c5282;" id="mastHwOngoing">0</div><div style="font-family: 'VT323', monospace; font-size: 10px; color: #2c5282;">ONGOING</div></div>
+            <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);"><div style="font-size: 20px; font-weight: bold; color: #1a533c;" id="mastHwComplete">0</div><div style="font-family: 'VT323', monospace; font-size: 10px; color: #1a533c;">COMPLETE</div></div>
+            <div class="panel" style="flex: 1; padding: 8px 4px; text-align: center; background: var(--surface); box-shadow: 1px 1px 0 var(--lavender);"><div style="font-size: 20px; font-weight: bold; color: #742a2a;" id="mastHwOverdue">0</div><div style="font-family: 'VT323', monospace; font-size: 10px; color: #742a2a;">OVERDUE</div></div>
+          </div>
+        </div>
+      </div>
+      <div id="allTasksContent" style="display: flex; flex-direction: column; gap: 8px;"></div>
+    </div>
+  </div>
+
   <!-- Subject Overview Modal -->
   <div id="subjectOverviewModal" class="panel" style="display: none; width: 600px; max-width: 95vw; max-height: 90vh; flex-direction: column;">
     <div class="win-bar" style="background: var(--pink);">
@@ -314,10 +410,72 @@
       </div>
     </div>
     <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
-      <div class="custom-title">✦ UPCOMING EXAMS</div>
+      <div class="custom-title">✦ EXAMS & PAST HISTORY</div>
       <ul id="subjOverviewExams" class="todo-list" style="list-style: none; padding: 0; margin: 0; margin-bottom: 20px;"></ul>
       <div class="custom-title">✦ HOMEWORK & ASSIGNMENTS</div>
       <ul id="subjOverviewHw" class="todo-list" style="list-style: none; padding: 0; margin: 0;"></ul>
+    </div>
+  </div>
+
+  <!-- Timetable / Schedule Modal -->
+  <div id="scheduleModal" class="panel" style="display: none; width: 650px; max-width: 95vw; max-height: 90vh; flex-direction: column;">
+    <div class="win-bar" style="background: var(--mint);">
+      <span class="win-title">★ TIMETABLE_OS.EXE</span>
+      <div class="win-btns"><button class="wbtn" onclick="closeModals()">×</button></div>
+    </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
+      <div class="custom-title">✦ WEEKLY SCHEDULE CONFIGURATION</div>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center;">
+        <select id="schedCategoryInp" class="todo-inp" style="padding: 6px; font-size: 14px; flex: 1;">
+          <option value="class">🎓 UNI CLASS</option>
+          <option value="event">📅 EXT EVENT</option>
+        </select>
+        <select id="schedSubjectInp" class="todo-inp" style="padding: 6px; font-size: 14px; flex: 1;"><option value="">(No Subject)</option></select>
+        <select id="schedModeInp" class="todo-inp" style="padding: 6px; font-size: 14px; flex: 1;">
+          <option value="Physical">🏫 PHYSICAL</option>
+          <option value="Online">🌐 ONLINE</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 6px; margin-bottom: 12px; align-items: center;">
+        <select id="schedDayInp" class="todo-inp" style="flex: 1; padding: 6px; font-size: 14px;">
+          <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+          <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+        </select>
+        <span style="font-family: 'VT323', monospace; color: var(--muted); font-size: 12px; margin: 0 4px;">TO</span>
+        <select id="schedEndDayInp" class="todo-inp" style="flex: 1; padding: 6px; font-size: 14px;" title="End Day (Optional)">
+          <option value="">(None)</option>
+          <option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option>
+          <option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option>
+        </select>
+        <input class="todo-inp" type="time" id="schedTimeInp" title="Start Time" style="flex: 1; padding: 6px;" required>
+        <input class="todo-inp" type="time" id="schedEndTimeInp" title="End Time (Optional)" style="flex: 1; padding: 6px;">
+      </div>
+      <div style="display: flex; gap: 6px; margin-bottom: 12px; align-items: center;">
+        <input class="todo-inp" type="text" id="schedTitleInp" placeholder="Class / Event Name..." style="flex: 2;">
+        <input class="todo-inp" type="date" id="schedStartDateInp" title="Start Date / Event Date" style="flex: 1; padding: 6px;">
+        <span style="font-family: 'VT323', monospace; color: var(--muted); font-size: 12px; margin: 0 4px;">TO</span>
+        <input class="todo-inp" type="date" id="schedEndDateInp" title="Valid Until (Optional)" style="flex: 1; padding: 6px;">
+        <button class="add-btn" id="addSchedBtn" style="padding: 2px 8px; background: var(--mint); box-shadow: none;">ADD</button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: 8px; margin-bottom: 10px;">
+         <span style="font-size: 13px; color: var(--muted); font-family: 'VT323', monospace; letter-spacing: 1px;">Import your timetable:</span>
+         <div style="display: flex; gap: 8px;">
+           <label class="btn" style="padding: 2px 8px; font-size: 13px; cursor: pointer; margin: 0; background: var(--blue);">UPLOAD JSON<input type="file" id="importScheduleJsonInp" style="display:none;" onchange="importScheduleJson(event)" accept=".json" multiple></label>
+         </div>
+      </div>
+      <div class="mode-tabs" style="border: 1px solid var(--border); background: var(--surface);">
+        <button class="mtab active" id="stab-all" onclick="applySchedFilter('all')">ALL</button>
+        <button class="mtab" id="stab-class" onclick="applySchedFilter('class')" style="border-left: 1px solid var(--border); border-right: 1px solid var(--border);">🎓 CLASSES</button>
+        <button class="mtab" id="stab-event" onclick="applySchedFilter('event')">📅 EVENTS</button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="custom-title" style="margin-bottom: 0; color: var(--dark);">✦ MASTER TIMETABLE</div>
+          <button id="bulkDelBtn" style="display: none; background: #c04080; color: white; padding: 2px 6px; border: none; border-radius: 4px; font-family: 'VT323', monospace; font-size: 13px; cursor: pointer; box-shadow: none;">✕ DELETE SELECTED (<span id="bulkDelCount">0</span>)</button>
+        </div>
+        <button class="del-btn" onclick="clearAllSchedule()" style="opacity: 1; font-size: 13px; color: #c04080; border: 1px solid #c04080; padding: 2px 6px; border-radius: 4px;">✕ CLEAR ALL</button>
+      </div>
+      <ul id="scheduleList" class="todo-list" style="list-style: none; padding: 0; margin: 0; flex: 1; max-height: 400px; overflow-y: auto;"></ul>
     </div>
   </div>
 
@@ -389,6 +547,14 @@
           <div id="petSel4" onclick="selectPet(4)" style="width: 48px; height: 48px; border: 2px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: var(--surface);">
             <img src="pet/pet 4.gif" style="width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated;">
           </div>
+        </div>
+      </div>
+      <div style="width: 100%; border-top: 2px dashed var(--border); margin: 8px 0;"></div>
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+        <span class="custom-title" style="margin-bottom: 0; text-align: center;">✦ SYSTEM DATA BACKUP</span>
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <button class="btn" onclick="exportUserDataToFile()" style="flex: 1; padding: 6px; background: var(--blue); color: var(--dark); font-weight: bold;">💾 EXPORT DAT</button>
+          <label class="btn" style="flex: 1; padding: 6px; background: var(--pink); color: var(--dark); font-weight: bold; text-align: center; cursor: pointer; margin: 0;">📂 IMPORT DAT<input type="file" style="display:none;" onchange="importUserDataFromFile(event)" accept=".dat,.json"></label>
         </div>
       </div>
       <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">

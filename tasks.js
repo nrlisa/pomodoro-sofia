@@ -88,7 +88,7 @@ export function renderSubjects(subjects) {
   // Auto-refresh tasks and calendar so color changes cascade instantly!
   if (window.currentExams) renderExams(window.currentExams);
   if (window.currentHomework) renderHomework(window.currentHomework);
-  if (window.renderCalendarGrid && document.getElementById('calendarModal')?.style.display !== 'none') window.renderCalendarGrid();
+  if (window.renderCalendarGrid) window.renderCalendarGrid();
 }
 
 window.updateSubjectColor = async (id, newColor) => {
@@ -196,6 +196,8 @@ function renderTodos(todos) {
       </li>
     `;
   }).join('');
+
+  if (window.renderCalendarGrid) window.renderCalendarGrid();
 }
 
 // --- EXAM OPERATIONS ---
@@ -309,6 +311,8 @@ function renderExams(exams) {
   }).join('');
   const badge = document.getElementById('badge-exam');
   if (badge) badge.textContent = ongoingCount;
+
+  if (window.renderCalendarGrid) window.renderCalendarGrid();
 }
 
 // --- EXAM STUDY TOPICS OPERATIONS ---
@@ -544,6 +548,8 @@ function renderHomework(hwItems) {
   }).join('');
   const badge = document.getElementById('badge-hw');
   if (badge) badge.textContent = ongoingCount;
+
+  if (window.renderCalendarGrid) window.renderCalendarGrid();
 }
 
 window.currentHwId = null;

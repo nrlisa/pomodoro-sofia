@@ -36,29 +36,48 @@ window.renderCalendarGrid = () => {
   
   const exams = window.currentExams || [];
   const homework = window.currentHomework || [];
+  const todos = window.currentTodos || [];
+  const todayStr = getLocalYMD(new Date());
   
   for (let d = 1; d <= daysInMonth; d++) {
     const dObj = new Date(year, month, d);
     const dateStr = getLocalYMD(dObj);
     const isSelected = dateStr === selectedCalDate;
-    const isToday = dateStr === getLocalYMD(new Date());
+    const isToday = dateStr === todayStr;
     
     const dayExams = exams.filter(e => e.date === dateStr);
     const dayHw = homework.filter(h => h.date === dateStr);
+    const dayTodos = todos.filter(t => t.date === dateStr);
     
     let dots = '';
     dayExams.forEach(e => {
       const s = (window.currentSubjects || []).find(sub => sub.id === e.subjectId);
-      dots += `<div class="cal-dot" style="background: ${s ? s.color : (e.color || 'var(--pink)')};" title="Exam: ${e.name}"></div>`;
+      const isPassed = e.date < todayStr;
+      if (isPassed) {
+        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted);" title="Passed Exam: ${e.name}"></div>`;
+      } else {
+        dots += `<div class="cal-dot" style="background: ${s ? s.color : (e.color || 'var(--pink)')};" title="Exam: ${e.name}"></div>`;
+      }
     });
     dayHw.forEach(h => {
       const s = (window.currentSubjects || []).find(sub => sub.id === h.subjectId);
-      dots += `<div class="cal-dot" style="background: ${s ? s.color : (h.color || 'var(--blue)')}; border-radius: 2px;" title="HW: ${h.name}"></div>`;
+      if (h.submitted) {
+        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted); border-radius: 2px;" title="Submitted: ${h.name}"></div>`;
+      } else {
+        dots += `<div class="cal-dot" style="background: ${s ? s.color : (h.color || 'var(--blue)')}; border-radius: 2px;" title="HW: ${h.name}"></div>`;
+      }
+    });
+    dayTodos.forEach(t => {
+      if (t.done) {
+        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted); border-radius: 50%;" title="Done: ${t.text}"></div>`;
+      } else {
+        dots += `<div class="cal-dot" style="background: var(--mint); border-radius: 50%;" title="Todo: ${t.text}"></div>`;
+      }
     });
     
     html += `
-      <div class="cal-day ${isSelected ? 'active' : ''}" onclick="selectCalDate('${dateStr}')" style="${isToday && !isSelected ? 'border-color: var(--mint);' : ''}">
-        <span>${d}</span>
+      <div class="cal-day ${isSelected ? 'active' : ''}" onclick="selectCalDate('${dateStr}')" style="${isToday ? 'background: #e1f2ec; border-color: #a0d8c0;' : ''}">
+        <span style="display:flex; justify-content:space-between; width:100%;">${d} ${isToday ? '<span style="font-size:10px; color:var(--dark); font-weight:bold; letter-spacing:1px; background:var(--mint); padding:0 4px; border-radius:4px;">TODAY</span>' : ''}</span>
         <div class="cal-dots">${dots}</div>
       </div>
     `;
@@ -85,7 +104,7 @@ window.renderCalAgenda = () => {
   
   const exams = (window.currentExams || []).filter(e => e.date === selectedCalDate);
   const homework = (window.currentHomework || []).filter(h => h.date === selectedCalDate);
-  const todos = (window.currentTodos || []).filter(t => t.date === selectedCalDate && !t.done);
+  const todos = (window.currentTodos || []).filter(t => t.date === selectedCalDate);
   const list = document.getElementById('calAgendaList');
   const container = document.getElementById('calAgendaContainer');
   
@@ -95,14 +114,16 @@ window.renderCalAgenda = () => {
   }
   if (container) container.style.display = 'block';
   
+  const todayStr = getLocalYMD(new Date());
   let html = '';
   exams.forEach(e => {
     const s = (window.currentSubjects || []).find(sub => sub.id === e.subjectId);
+    const isPassed = e.date < todayStr;
     html += `
-      <li class="todo-item" onclick="openExamModal('${e.id}')" style="margin-bottom: 6px; border-left: 6px solid ${s ? s.color : (e.color || 'var(--pink)')}; background: var(--surface);">
+      <li class="todo-item ${isPassed ? 'done' : ''}" onclick="openExamModal('${e.id}')" style="margin-bottom: 6px; border-left: 6px solid ${s ? s.color : (e.color || 'var(--pink)')}; background: var(--surface);">
         <span class="todo-txt" style="display: flex; gap: 8px;">
-          <span style="font-size: 13px; color: #fff; background: #c04080; padding: 2px 6px; border-radius: 4px; align-self: flex-start;">EXAM</span>
-          <strong>${e.name}</strong>
+          <span style="font-size: 13px; color: #fff; background: ${isPassed ? 'var(--muted)' : '#c04080'}; padding: 2px 6px; border-radius: 4px; align-self: flex-start;">EXAM</span>
+          <strong style="${isPassed ? 'text-decoration: line-through; color: var(--muted);' : ''}">${e.name}</strong>
         </span>
       </li>
     `;
@@ -121,10 +142,10 @@ window.renderCalAgenda = () => {
   });
   todos.forEach(t => {
     html += `
-      <li class="todo-item" style="margin-bottom: 6px; border-left: 6px solid var(--blue); background: var(--surface);">
+      <li class="todo-item ${t.done ? 'done' : ''}" style="margin-bottom: 6px; border-left: 6px solid var(--blue); background: var(--surface);">
         <span class="todo-txt" style="display: flex; gap: 8px;">
-          <span style="font-size: 13px; color: var(--dark); background: var(--mint); padding: 2px 6px; border-radius: 4px; align-self: flex-start;">TODO</span>
-          <strong>${t.text}</strong>
+          <span style="font-size: 13px; color: var(--dark); background: ${t.done ? 'var(--muted)' : 'var(--mint)'}; padding: 2px 6px; border-radius: 4px; align-self: flex-start;">TODO</span>
+          <strong style="${t.done ? 'text-decoration: line-through; color: var(--muted);' : ''}">${t.text}</strong>
         </span>
       </li>
     `;

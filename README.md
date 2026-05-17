@@ -31,6 +31,8 @@ Features unified submission records mapping distinct deliverables, nested target
 Offers chronological exam tracking equipped with systemic status badges detailing deadline proximity such as `Today`, `Days Left`, or `Passed`.
 * **Daily Task Scheduler (`TODO_LIST.EXE`)**
 Integrates modular tracking checklists equipped with systematic garbage collection routines to purge finished sub-tasks instantly.
+* **Master Timetable (`TIMETABLE_OS.EXE`)**
+  Features a robust weekly scheduling engine with 12/24-hour time auto-parsing, multi-file JSON bulk imports, cross-course metadata synchronization, and one-click smart batch deletion.
 
 ### 📊 System Metadata and Controls
 
@@ -38,6 +40,8 @@ Integrates modular tracking checklists equipped with systematic garbage collecti
 Implements automated subject folder tracking across academic semesters 5 through 9 with custom hex color configurations that cascade dynamically across standard viewport borders.
 * **Matrix Calendar (`CALENDAR.EXE`)**
 Utilizes a reactive grid layout engine to map calendar blocks color-coded by subject alongside a chronological daily agenda sidebar panel.
+* **Master Dashboard (`MASTER_TASKS.EXE`)**
+  A unified control center tracking aggregate statuses (Not Started, Ongoing, Complete, Overdue) across all academic homework, exams, and daily tasks.
 * **Productivity Ledger (`HISTORY.EXE`)**
 Drives a sliding 7-day data pipeline that aggregates completed focus intervals into a clean weekly performance bar graph.
 
@@ -60,7 +64,13 @@ Drives a sliding 7-day data pipeline that aggregates completed focus intervals i
 ├── .gitignore                     # Security filter preventing credential leaks
 ├── index.html                     # Core interface layout and window panels
 ├── script.js                      # Central state coordinator and audio engine
-├── tasks.js                       # Task operations, trackers, and dynamic modals
+├── tasks.js                       # Shared database mutation and utility engine
+├── dashboard.js                   # Master overview analytics and task aggregation
+├── schedule.js                    # Timetable engine, time parsing, and JSON imports
+├── subjects.js                    # Course metadata and folder color synchronization
+├── todos.js                       # Daily ad-hoc task manager
+├── exams.js                       # Exam tracking and study topic checklists
+├── homework.js                    # Assignment tracker and sub-task manager
 ├── calendar.js                    # Matrix engines generating data grid views
 └── styles.css                     # Custom variables, animations, and typography
 

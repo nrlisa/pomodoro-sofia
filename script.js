@@ -4,9 +4,12 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, on
 
 import { firebaseConfig } from './firebase-config.js';
 
-let app, auth, db;
-let currentUser = null;
-let useFirebase = false;
+import { renderTodos, renderExams, renderHomework, renderSubjects } from './tasks.js';
+import './calendar.js';
+
+export let app, auth, db;
+export let currentUser = null;
+export let useFirebase = false;
 let historyDocs = [];
 let unsubHistory = null;
 
@@ -14,6 +17,8 @@ try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  
+  window.db = db; // Expose globally for module safety
 
   onAuthStateChanged(auth, (user) => {
     const loginScreen = document.getElementById('loginScreen');
@@ -21,6 +26,7 @@ try {
 
     if (user) {
       currentUser = user;
+      window.currentUser = user;
       useFirebase = true;
       if (loginScreen) loginScreen.style.display = 'none';
       if (mainApp) mainApp.style.display = 'flex';
@@ -30,6 +36,8 @@ try {
 
       syncData('todos', collection(db, "users", user.uid, "todos"), renderTodos);
       syncData('exams', collection(db, "users", user.uid, "exams"), renderExams);
+      syncData('homework', collection(db, "users", user.uid, "homework"), renderHomework);
+      syncData('subjects', collection(db, "users", user.uid, "subjects"), renderSubjects);
       setupRealtimeHistory();
     } else {
       currentUser = null;
@@ -41,43 +49,55 @@ try {
       
       document.getElementById('todoList').innerHTML = "<li>Please sign in to view items.</li>";
       document.getElementById('examList').innerHTML = "";
+      document.getElementById('hwList').innerHTML = "";
+      if(document.getElementById('subjectList')) document.getElementById('subjectList').innerHTML = "";
       renderHistory();
     }
   });
-
-  const signInBtn = document.getElementById('signInBtn');
-  if (signInBtn) {
-    signInBtn.addEventListener('click', async () => {
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      const errorDiv = document.getElementById('authError');
-      errorDiv.textContent = "";
-
-      if (!email || !password) {
-        errorDiv.textContent = "⚠️ INPUTS CANNOT BE EMPTY";
-        return;
-      }
-
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (loginError) {
-        if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
-          try {
-            await createUserWithEmailAndPassword(auth, email, password);
-          } catch (registerError) {
-            errorDiv.textContent = `⚠️ ${registerError.message.replace("Firebase: ", "")}`;
-          }
-        } else {
-          errorDiv.textContent = `⚠️ ${loginError.message.replace("Firebase: ", "")}`;
-        }
-      }
-    });
-  }
 
 } catch (e) {
   console.error("Firebase init failed. Falling back to localStorage.", e);
   useFirebase = false;
 }
+
+const signInBtn = document.getElementById('signInBtn');
+const loginPasswordInp = document.getElementById('loginPassword');
+const errorDiv = document.getElementById('authError');
+
+const handleLogin = async () => {
+  if (!auth) {
+    errorDiv.textContent = "⚠️ FIREBASE CONNECTION ERROR. CHECK CONFIG.";
+    return;
+  }
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = loginPasswordInp.value;
+  errorDiv.textContent = "";
+
+  if (!email || !password) {
+    errorDiv.textContent = "⚠️ INPUTS CANNOT BE EMPTY";
+    return;
+  }
+
+  errorDiv.textContent = "LOADING... ★";
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (loginError) {
+    if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch (registerError) {
+        errorDiv.textContent = `⚠️ ${registerError.message.replace("Firebase: ", "")}`;
+      }
+    } else {
+      errorDiv.textContent = `⚠️ ${loginError.message.replace("Firebase: ", "")}`;
+    }
+  }
+};
+
+if (signInBtn) signInBtn.addEventListener('click', handleLogin);
+if (loginPasswordInp) loginPasswordInp.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleLogin();
+});
 
 const CIRC = 452.4;
 const loadCFG = () => JSON.parse(localStorage.getItem('pomo_cfg')) || { focus: 25, short: 5, long: 15 };
@@ -95,6 +115,72 @@ let pendingNextMode = null;
 let audioCtx = null;
 let audioUnlocked = false;
 let hasStartedCurrentSession = false;
+
+// Ambient Audio Setup
+const AMBIENT_SOUNDS = {
+  rain: 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg',
+  noise: 'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg'
+};
+let currentAmbient = 'off';
+let ambientAudio = new Audio();
+ambientAudio.loop = true;
+ambientAudio.volume = 0.5;
+
+let gammaOsc = null;
+let gammaGain = null;
+
+function startGamma() {
+  ensureAudio();
+  if (gammaOsc) return;
+  gammaOsc = audioCtx.createOscillator();
+  gammaGain = audioCtx.createGain();
+  gammaOsc.type = 'sine';
+  gammaOsc.frequency.value = 40; // 40Hz Gamma Tone
+  
+  // Smooth fade-in to prevent clicking noises
+  gammaGain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gammaGain.gain.linearRampToValueAtTime(document.getElementById('ambVol').value, audioCtx.currentTime + 0.1);
+  
+  gammaOsc.connect(gammaGain);
+  gammaGain.connect(audioCtx.destination);
+  gammaOsc.start();
+}
+
+function stopGamma() {
+  if (gammaOsc && gammaGain) {
+    // Smooth fade-out
+    gammaGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+    const oscToStop = gammaOsc;
+    gammaOsc = null;
+    setTimeout(() => {
+      try { oscToStop.stop(); } catch(e){}
+    }, 100);
+  }
+}
+
+window.setAmbient = (type) => {
+  currentAmbient = type;
+  document.querySelectorAll('.amb-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('amb-' + type).classList.add('active');
+  
+  ambientAudio.pause();
+  stopGamma();
+
+  if (type === 'gamma') {
+    if (running) startGamma();
+  } else if (type !== 'off') {
+    ambientAudio.src = AMBIENT_SOUNDS[type];
+    if (running) ambientAudio.play().catch(e => console.error(e));
+  }
+};
+
+window.updateAmbientVolume = () => {
+  const vol = document.getElementById('ambVol').value;
+  ambientAudio.volume = vol;
+  if (gammaGain && audioCtx) {
+    gammaGain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.1);
+  }
+};
 
 // History logic
 function setupRealtimeHistory() {
@@ -217,7 +303,7 @@ function updateStartBtnUI() {
       <div class="idle-pulse" style="font-family: 'VT323', monospace; font-size: 15px; font-weight: bold; color: ${color}; letter-spacing: 1.5px;">${modeAction}</div>
     `;
   } else {
-    const txt = running ? 'PAUSE' : 'RESUME';
+    const txt = running ? 'PAUSE' : 'START';
     const clz = running ? '' : 'idle-pulse';
     container.innerHTML = `
       <div class="${clz}" style="font-family: 'VT323', monospace; font-size: 14px; color: var(--muted); letter-spacing: 2px; margin-top: 14px;">${txt}</div>
@@ -226,18 +312,21 @@ function updateStartBtnUI() {
 }
 
 function applyCustom() {
-  if (running) return;
   CFG.focus = Math.min(120, Math.max(1, parseInt(document.getElementById('inp-focus').value) || 25));
   CFG.short = Math.min(60,  Math.max(1, parseInt(document.getElementById('inp-short').value) || 5));
   CFG.long  = Math.min(90,  Math.max(1, parseInt(document.getElementById('inp-long').value)  || 15));
+  
   document.getElementById('inp-focus').value = CFG.focus;
   document.getElementById('inp-short').value = CFG.short;
   document.getElementById('inp-long').value  = CFG.long;
+  
   localStorage.setItem('pomo_cfg', JSON.stringify(CFG));
-  totalSecs = CFG[mode] * 60;
-  secsLeft = totalSecs;
-  updateDisp(); updateRing();
-  document.getElementById('statusTxt').textContent = 'TIMES UPDATED!';
+  
+  if (!running) {
+    totalSecs = CFG[mode] * 60;
+    secsLeft = totalSecs;
+    updateDisp(); updateRing();
+  }
 }
 
 function updateDisp() {
@@ -277,6 +366,13 @@ function startTimer() {
   updateStartBtnUI();
   document.getElementById('statusTxt').textContent = 'RUNNING...';
   tickTimer();
+  
+  if (currentAmbient === 'gamma') {
+    startGamma();
+  } else if (currentAmbient !== 'off' && ambientAudio.src) {
+    ambientAudio.play().catch(e => console.log(e));
+  }
+
   iv = setInterval(tickTimer, 250);
 }
 
@@ -291,21 +387,45 @@ function handleStart() {
     iv = null;
     timerEnd = null;
     running = false;
+    ambientAudio.pause();
+    stopGamma();
     updateStartBtnUI();
     document.getElementById('statusTxt').textContent = 'PAUSED';
   } else {
     startTimer();
   }
+
+  // Ask for browser notification permissions if not already granted/denied
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
 }
 
 async function onEnd() {
   timerEnd = null;
+  ambientAudio.pause();
+  stopGamma();
 
   const historyItem = {
     timestamp: Date.now(),
     mode: mode,
     durationMinutes: CFG[mode]
   };
+
+  // Auto-exit PiP window if it's active
+  if (document.pictureInPictureElement) {
+    document.exitPictureInPicture().catch(e => console.error(e));
+  }
+
+  if (mode === 'focus') {
+    sessions = Math.min(sessions + 1, 4);
+    localStorage.setItem('pomo_sessions', sessions);
+    updateDots();
+  }
+  pendingNextMode = getNextMode(mode);
+  
+  hasStartedCurrentSession = false;
+  setMode(pendingNextMode, false);
 
   if (useFirebase && currentUser) {
     try {
@@ -318,20 +438,16 @@ async function onEnd() {
   } else {
     addHistoryLocal(historyItem);
   }
-
-  if (mode === 'focus') {
-    sessions = Math.min(sessions + 1, 4);
-    localStorage.setItem('pomo_sessions', sessions);
-    updateDots();
-  }
-  pendingNextMode = getNextMode(mode);
   
   playLoop();
   document.getElementById('statusTxt').textContent = '★ SESSION COMPLETE ★';
-  
-  hasStartedCurrentSession = false;
-  // Auto switch mode, wait for user to start it manually
-  setMode(pendingNextMode, false);
+
+  // Fire native browser notification
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("★ P0M0D0R0.EXE", {
+      body: `Your ${modeLabels[historyItem.mode]} session has finished!`,
+    });
+  }
 }
 
 function addHistoryLocal(item) {
@@ -339,6 +455,50 @@ function addHistoryLocal(item) {
   localHist.push(item);
   localStorage.setItem('pomo_history', JSON.stringify(localHist));
   renderHistory();
+}
+
+function renderChart(items) {
+  const container = document.getElementById('weeklyChartContainer');
+  if (!container) return;
+
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const dayMinutes = [0, 0, 0, 0, 0, 0, 0];
+
+  const getDayIndex = (date) => {
+    const day = date.getDay();
+    return day === 0 ? 6 : day - 1; // Maps Sun to 6, Mon to 0
+  };
+
+  items.forEach(item => {
+    if (item.mode === 'focus') {
+      const dayIdx = getDayIndex(new Date(item.timestamp));
+      dayMinutes[dayIdx] += parseInt(item.durationMinutes, 10) || 0;
+    }
+  });
+
+  const maxMinutes = Math.max(...dayMinutes, 1);
+
+  let html = '';
+  days.forEach((dayLabel, idx) => {
+    const mins = dayMinutes[idx];
+    // Max 75% height ensures labels at the top never get cut off
+    const heightPct = (mins / maxMinutes) * 75; 
+    
+    let barHtml = mins > 0 
+      ? `<span style="font-size: 12px; color: var(--pink); font-family: 'VT323', monospace; margin-bottom: 4px;">${mins}m</span>
+         <div style="height: ${heightPct}%; width: 24px; background: var(--pink); border-radius: 4px;"></div>`
+      : `<span style="font-size: 12px; color: var(--muted); font-family: 'VT323', monospace; margin-bottom: 4px;">-</span>
+         <div style="height: 0px; width: 24px; border-bottom: 2px dashed var(--muted); margin-bottom: 2px;"></div>`;
+
+    html += `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
+        ${barHtml}
+        <span style="font-size: 12px; color: var(--muted); font-weight: bold; margin-top: 4px;">${dayLabel}</span>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
 }
 
 function renderHistory() {
@@ -350,6 +510,8 @@ function renderHistory() {
   
   items = items.filter(i => i.timestamp >= sevenDaysAgo);
   items.sort((a, b) => b.timestamp - a.timestamp);
+
+  renderChart(items);
 
   if (items.length === 0) {
     listEl.innerHTML = '<div class="todo-empty">NO HISTORY YET ★</div>';
@@ -383,6 +545,8 @@ function renderHistory() {
 function handleReset() {
   ensureAudio();
   clearInterval(iv); iv = null; timerEnd = null;
+  ambientAudio.pause();
+  stopGamma();
   stopSound(); running = false;
   hasStartedCurrentSession = false;
   pendingNextMode = null;
@@ -394,6 +558,8 @@ function handleReset() {
 function handleSkip() {
   ensureAudio();
   clearInterval(iv); iv = null; timerEnd = null;
+  ambientAudio.pause();
+  stopGamma();
   stopSound(); running = false;
   if (mode === 'focus') {
     sessions = Math.min(sessions + 1, 4);
@@ -431,127 +597,6 @@ function syncData(type, colRef, renderFn) {
   });
 }
 
-// --- TODO OPERATIONS ---
-document.getElementById('addTodoBtn')?.addEventListener('click', async () => {
-  const text = document.getElementById('todoInp').value.trim();
-  if (!text || !currentUser) return;
-  await addDoc(collection(db, "users", currentUser.uid, "todos"), { text, done: false });
-  document.getElementById('todoInp').value = "";
-});
-document.getElementById('todoInp')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') document.getElementById('addTodoBtn').click();
-  if (e.key === 'Escape') e.target.value = '';
-});
-
-function renderTodos(todos) {
-  const list = document.getElementById('todoList');
-  if (!list) return;
-  
-  if (todos.length === 0) {
-    list.innerHTML = '<div class="todo-empty">NO TASKS YET ★<br>ADD ONE ABOVE!</div>';
-    return;
-  }
-  
-  list.innerHTML = todos.map(t => `
-    <li class="todo-item ${t.done ? 'done' : ''}" style="margin-bottom: 6px;">
-      <span class="todo-txt" style="cursor: pointer; display: flex; align-items: center; gap: 8px;" onclick="toggleTodo('${t.id}', ${t.done})">
-        <div class="todo-check">${t.done ? '✓' : ''}</div>
-        ${t.text.replace(/</g, '&lt;')}
-      </span>
-      <div style="display: flex; gap: 4px; margin-left: auto;">
-        <button class="del-btn" onclick="editItem('todos', '${t.id}', '${t.text.replace(/'/g, "\\'")}')" style="opacity: 1; font-size: 14px;">✏️</button>
-        <button class="del-btn" onclick="deleteItem('todos', '${t.id}')" style="opacity: 1;">✕</button>
-      </div>
-    </li>
-  `).join('');
-}
-
-// --- EXAM OPERATIONS ---
-document.getElementById('addExamBtn')?.addEventListener('click', async () => {
-  const name = document.getElementById('examNameInp').value.trim();
-  const date = document.getElementById('examDateInp').value;
-  if (!name || !date || !currentUser) return;
-  await addDoc(collection(db, "users", currentUser.uid, "exams"), { name, date });
-  document.getElementById('examNameInp').value = "";
-  document.getElementById('examDateInp').value = "";
-});
-document.getElementById('examNameInp')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') document.getElementById('addExamBtn').click();
-});
-
-function renderExams(exams) {
-  const list = document.getElementById('examList');
-  if (!list) return;
-  const today = new Date();
-  today.setHours(0,0,0,0);
-
-  if (exams.length === 0) {
-    list.innerHTML = '<div class="todo-empty">NO TESTS UPCOMING ★</div>';
-    return;
-  }
-
-  list.innerHTML = exams.map(e => {
-    const examDate = new Date(e.date);
-    examDate.setHours(0,0,0,0);
-    const daysLeft = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
-    
-    let style = "color: var(--text);";
-    let statusText = `${daysLeft} days left`;
-    
-    if (daysLeft === 0) {
-      style = "color: #c04080; font-weight: bold;";
-      statusText = "🚨 TODAY!!!";
-    } else if (daysLeft > 0 && daysLeft <= 3) {
-      style = "color: #c04080;";
-      statusText = `⚠️ ONLY ${daysLeft} DAYS LEFT!`;
-    } else if (daysLeft < 0) {
-      style = "color: var(--muted); text-decoration: line-through;";
-      statusText = "PASSED";
-    }
-
-    return `
-      <li class="todo-item" style="margin-bottom: 6px; ${style}">
-        <span class="todo-txt" style="display: flex; flex-direction: column; gap: 4px;">
-          <strong>${e.name.replace(/</g, '&lt;')}</strong>
-          <span style="font-size: 13px; color: var(--pink); background: var(--dark); padding: 2px 6px; border-radius: 4px; align-self: flex-start; letter-spacing: 1px;">📅 ${e.date} (${statusText})</span>
-        </span>
-        <div style="display: flex; gap: 4px; margin-left: auto;">
-          <button class="del-btn" onclick="editExam('${e.id}', '${e.name.replace(/'/g, "\\'")}', '${e.date}')" style="opacity: 1; font-size: 14px;">✏️</button>
-          <button class="del-btn" onclick="deleteItem('exams', '${e.id}')" style="opacity: 1;">✕</button>
-        </div>
-      </li>
-    `;
-  }).join('');
-}
-
-// --- GLOBAL MUTATION UTILITIES ---
-window.toggleTodo = async (id, currentStatus) => {
-  if(!currentUser) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "todos", id), { done: !currentStatus });
-};
-
-window.deleteItem = async (type, id) => {
-  if (currentUser && confirm("Delete this item?")) {
-    await deleteDoc(doc(db, "users", currentUser.uid, type, id));
-  }
-};
-
-window.editItem = async (type, id, oldText) => {
-  const newText = prompt(`Edit entry:`, oldText);
-  if (currentUser && newText && newText.trim() !== "") {
-    await updateDoc(doc(db, "users", currentUser.uid, type, id), { text: newText.trim() });
-  }
-};
-
-window.editExam = async (id, oldName, oldDate) => {
-  const newName = prompt("Edit Exam Name:", oldName);
-  if (!newName || !currentUser) return;
-  const newDate = prompt("Edit Exam Date (YYYY-MM-DD):", oldDate);
-  if (!newDate) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "exams", id), { name: newName.trim(), date: newDate });
-};
-
-
 function drawTimerOnCanvas() {
   const canvas = document.getElementById('timerCanvas');
   const ctx = canvas.getContext('2d');
@@ -577,7 +622,7 @@ function drawTimerOnCanvas() {
   ctx.stroke();
 
   ctx.fillStyle = '#d060a0';
-  ctx.font = 'bold 30px VT323';
+  ctx.font = 'bold 30px Orbitron';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const m = String(Math.floor(secsLeft / 60)).padStart(2, '0');
@@ -627,6 +672,16 @@ async function togglePiP() {
 
 window.addEventListener('load', () => {
   updateStartBtnUI();
+
+  // Auto-fill dates
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hwDateInp = document.getElementById('hwDateInp');
+  const examDateInp = document.getElementById('examDateInp');
+  const todoDateInp = document.getElementById('todoDateInp');
+  if (hwDateInp) hwDateInp.value = todayStr;
+  if (examDateInp) examDateInp.value = todayStr;
+  if (todoDateInp) todoDateInp.value = todayStr;
+
   const inpFocus = document.getElementById('inp-focus');
   if (inpFocus) {
     inpFocus.value = CFG.focus;
@@ -652,10 +707,22 @@ function openAnalytics() {
   renderHistory();
 }
 
+function openSubjects() {
+  closeModals();
+  document.getElementById('modalsContainer').style.display = 'flex';
+  document.getElementById('subjectModal').style.display = 'flex';
+}
+
 function closeModals() {
   document.getElementById('modalsContainer').style.display = 'none';
   document.getElementById('presetsModal').style.display = 'none';
   document.getElementById('analyticsModal').style.display = 'none';
+  document.getElementById('examModal').style.display = 'none';
+  document.getElementById('hwModal').style.display = 'none';
+  const cm = document.getElementById('calendarModal');
+  if (cm) cm.style.display = 'none';
+  document.getElementById('subjectModal').style.display = 'none';
+  document.getElementById('subjectOverviewModal').style.display = 'none';
 }
 
 function applyPreset(name, focus, short, long) {
@@ -670,11 +737,32 @@ function applyPreset(name, focus, short, long) {
     document.getElementById('inp-long').value = long;
   }
   
+  // Instantly close the presets modal window
+  closeModals();
+
+  // Reset the timer and automatically show the chosen preset
   hasStartedCurrentSession = false;
   setMode('focus', false);
-  closeModals();
-  document.getElementById('statusTxt').textContent = name + ' PRESET APPLIED!';
+  document.getElementById('statusTxt').textContent = name.toUpperCase() + ' PRESET APPLIED!';
 }
+
+window.switchTaskTab = (tab) => {
+  document.querySelectorAll('#ttab-todo, #ttab-hw, #ttab-exam').forEach(t => t.classList.remove('active'));
+  document.getElementById('ttab-' + tab).classList.add('active');
+  
+  const views = ['todo', 'hw', 'exam'];
+  views.forEach(v => {
+    const el = document.getElementById('tview-' + v);
+    if (v === tab) {
+      el.style.display = 'flex';
+      el.classList.remove('fade-in');
+      void el.offsetWidth; // Trigger DOM reflow to restart animation seamlessly
+      el.classList.add('fade-in');
+    } else {
+      el.style.display = 'none';
+    }
+  });
+};
 
 // Expose globals for index.html inline event handlers
 window.togglePiP = togglePiP;
@@ -685,5 +773,6 @@ window.handleSkip = handleSkip;
 window.applyCustom = applyCustom;
 window.openPresets = openPresets;
 window.openAnalytics = openAnalytics;
+window.openSubjects = openSubjects;
 window.closeModals = closeModals;
 window.applyPreset = applyPreset;

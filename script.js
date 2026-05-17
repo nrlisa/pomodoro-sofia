@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, where, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 import { firebaseConfig } from './firebase-config.js';
 
@@ -20,7 +20,7 @@ try {
   
   window.db = db; // Expose globally for module safety
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     const loginScreen = document.getElementById('loginScreen');
     const mainApp = document.getElementById('mainApp');
 
@@ -33,6 +33,21 @@ try {
       
       const statusEl = document.getElementById('statusTxt');
       if (statusEl) statusEl.textContent = `LOGGED IN AS: ${user.email}`;
+      const greetEl = document.getElementById('mainGreeting');
+      if (greetEl) greetEl.textContent = `★ HELLO, STUDENT! ★`;
+
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (userDocSnap.exists() && userDocSnap.data().displayName) {
+          const userName = userDocSnap.data().displayName.toUpperCase();
+          if (statusEl) statusEl.textContent = `WELCOME BACK, ${userName}!`;
+          if (greetEl) greetEl.textContent = `★ HELLO, ${userName}! ★`;
+        }
+      } catch (err) {
+        console.error("Error loading individualized profile name:", err);
+      }
 
       syncData('todos', collection(db, "users", user.uid, "todos"), renderTodos);
       syncData('exams', collection(db, "users", user.uid, "exams"), renderExams);
@@ -61,6 +76,8 @@ try {
 }
 
 const signInBtn = document.getElementById('signInBtn');
+const signUpBtn = document.getElementById('signUpBtn');
+const forgotPassBtn = document.getElementById('forgotPassBtn');
 const loginPasswordInp = document.getElementById('loginPassword');
 const errorDiv = document.getElementById('authError');
 
@@ -69,6 +86,7 @@ const handleLogin = async () => {
     errorDiv.textContent = "⚠️ FIREBASE CONNECTION ERROR. CHECK CONFIG.";
     return;
   }
+  document.getElementById('loginName').style.display = 'none';
   const email = document.getElementById('loginEmail').value.trim();
   const password = loginPasswordInp.value;
   errorDiv.textContent = "";
@@ -81,20 +99,73 @@ const handleLogin = async () => {
   errorDiv.textContent = "LOADING... ★";
   try {
     await signInWithEmailAndPassword(auth, email, password);
-  } catch (loginError) {
-    if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential') {
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch (registerError) {
-        errorDiv.textContent = `⚠️ ${registerError.message.replace("Firebase: ", "")}`;
-      }
-    } else {
-      errorDiv.textContent = `⚠️ ${loginError.message.replace("Firebase: ", "")}`;
-    }
+  } catch (error) {
+    errorDiv.textContent = `⚠️ ${error.message.replace("Firebase: ", "")}`;
+  }
+};
+
+const handleSignUp = async () => {
+  if (!auth) {
+    errorDiv.textContent = "⚠️ FIREBASE CONNECTION ERROR. CHECK CONFIG.";
+    return;
+  }
+  const email = document.getElementById('loginEmail').value.trim();
+  const nameInput = document.getElementById('loginName').value.trim();
+  const password = loginPasswordInp.value;
+  errorDiv.textContent = "";
+
+  const nameInpEl = document.getElementById('loginName');
+  if (nameInpEl.style.display === 'none') {
+    nameInpEl.style.display = 'block';
+    errorDiv.textContent = "⚠️ PLEASE ENTER YOUR NAME TO REGISTER";
+    return;
+  }
+
+  if (!nameInput || !email || !password) {
+    errorDiv.textContent = "⚠️ ALL INPUTS (NAME, EMAIL, PASSWORD) REQUIRED";
+    return;
+  }
+
+  errorDiv.textContent = "CREATING ACCOUNT... ★";
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const newUser = userCredential.user;
+    
+    await setDoc(doc(db, "users", newUser.uid), {
+      displayName: nameInput,
+      email: email,
+      createdAt: Date.now()
+    }, { merge: true });
+  } catch (error) {
+    errorDiv.textContent = `⚠️ ${error.message.replace("Firebase: ", "")}`;
+  }
+};
+
+const handleForgotPass = async () => {
+  if (!auth) {
+    errorDiv.textContent = "⚠️ FIREBASE CONNECTION ERROR. CHECK CONFIG.";
+    return;
+  }
+  const email = document.getElementById('loginEmail').value.trim();
+  errorDiv.textContent = "";
+
+  if (!email) {
+    errorDiv.textContent = "⚠️ ENTER EMAIL FOR RESET LINK";
+    return;
+  }
+
+  errorDiv.textContent = "SENDING EMAIL... ★";
+  try {
+    await sendPasswordResetEmail(auth, email);
+    errorDiv.textContent = "✅ RESET EMAIL SENT!";
+  } catch (error) {
+    errorDiv.textContent = `⚠️ ${error.message.replace("Firebase: ", "")}`;
   }
 };
 
 if (signInBtn) signInBtn.addEventListener('click', handleLogin);
+if (signUpBtn) signUpBtn.addEventListener('click', handleSignUp);
+if (forgotPassBtn) forgotPassBtn.addEventListener('click', handleForgotPass);
 if (loginPasswordInp) loginPasswordInp.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') handleLogin();
 });
@@ -776,3 +847,28 @@ window.openAnalytics = openAnalytics;
 window.openSubjects = openSubjects;
 window.closeModals = closeModals;
 window.applyPreset = applyPreset;
+
+window.handleSignOut = async () => {
+  if (auth && confirm("Are you sure you want to sign out?")) {
+    await signOut(auth);
+  }
+};
+
+window.editProfileName = async () => {
+  if (!currentUser) return;
+  try {
+    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+    const currentName = (userDoc.exists() && userDoc.data().displayName) ? userDoc.data().displayName : "";
+    
+    const newName = prompt(`Current name: ${currentName}\n\nEnter your new display name:`, currentName);
+    if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
+      await setDoc(doc(db, "users", currentUser.uid), { displayName: newName.trim() }, { merge: true });
+      const statusEl = document.getElementById('statusTxt');
+      if (statusEl) statusEl.textContent = `WELCOME BACK, ${newName.trim().toUpperCase()}!`;
+      const greetEl = document.getElementById('mainGreeting');
+      if (greetEl) greetEl.textContent = `★ HELLO, ${newName.trim().toUpperCase()}! ★`;
+    }
+  } catch (err) {
+    alert("Failed to update name: " + err.message);
+  }
+};

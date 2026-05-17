@@ -16,9 +16,14 @@
   </div>
   <div class="timer-body" style="gap: 12px; margin-top: 15px;">
     <div class="custom-title">✦ PLEASE SIGN IN TO CONTINUE</div>
+    <input class="todo-inp" type="text" id="loginName" placeholder="YOUR NAME..." style="display: none;">
     <input class="todo-inp" type="email" id="loginEmail" placeholder="EMAIL ADDRESS...">
     <input class="todo-inp" type="password" id="loginPassword" placeholder="PASSWORD...">
-    <button class="btn primary" id="signInBtn">SIGN IN / REGISTER</button>
+    <div style="display: flex; gap: 8px; width: 100%;">
+      <button class="btn primary" id="signInBtn" style="flex: 1;">SIGN IN</button>
+      <button class="btn primary" id="signUpBtn" style="flex: 1; background: var(--lavender); color: var(--dark); border-color: #d0c0e0;">REGISTER</button>
+    </div>
+    <button class="btn" id="forgotPassBtn" style="width: 100%; font-size: 14px; padding: 6px; box-shadow: none;">FORGOT PASSWORD?</button>
     <div class="stxt" id="authError" style="color: #c04080; margin-top: 5px;"></div>
   </div>
 </div>
@@ -93,10 +98,14 @@
         
         <div style="width: 100%; border-top: 2px dashed var(--border); padding-top: 12px; margin-top: 4px;">
           <div class="custom-title" style="text-align: center;">✦ DASHBOARD MENU</div>
-          <div style="display: flex; gap: 10px;">
-            <button class="btn" onclick="openAnalytics()" style="background: var(--mint); color: var(--dark); font-weight: bold;">📊 STATS</button>
-          <button class="btn" onclick="document.getElementById('cal-section').scrollIntoView({behavior: 'smooth'})" style="background: var(--lavender); color: var(--dark); font-weight: bold;">📅 CALENDAR</button>
-            <button class="btn" onclick="openSubjects()" style="background: var(--pink); color: var(--dark); font-weight: bold;">📚 SUBJECTS</button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn" onclick="openAnalytics()" style="background: var(--mint); color: var(--dark); font-weight: bold; flex: 1; padding: 6px;">📊 STATS</button>
+            <button class="btn" onclick="document.getElementById('cal-section').scrollIntoView({behavior: 'smooth'})" style="background: var(--lavender); color: var(--dark); font-weight: bold; flex: 1; padding: 6px;">📅 CALENDAR</button>
+            <button class="btn" onclick="openSubjects()" style="background: var(--pink); color: var(--dark); font-weight: bold; flex: 1; padding: 6px;">📚 SUBJECTS</button>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+            <button class="btn" onclick="editProfileName()" style="background: var(--blue); color: var(--dark); font-weight: bold; flex: 1; padding: 6px;">👤 EDIT NAME</button>
+            <button class="btn" onclick="handleSignOut()" style="background: var(--border); color: var(--dark); font-weight: bold; flex: 1; padding: 6px;">🚪 SIGN OUT</button>
           </div>
         </div>
       </div>
@@ -133,6 +142,11 @@
   </div>
 
   <div class="col-right">
+    <!-- GREETING PANEL -->
+    <div class="panel" style="width: 100%; margin-bottom: 16px; padding: 12px; background: var(--pink); display: flex; align-items: center; justify-content: center; border-color: #e090c0;">
+      <span id="mainGreeting" style="font-family: 'VT323', monospace; font-size: 24px; font-weight: bold; color: var(--dark); letter-spacing: 2px; text-shadow: 2px 2px 0 var(--surface);">★ HELLO, STUDENT! ★</span>
+    </div>
+
     <!-- UNIFIED TASKS PANEL -->
     <div class="panel" style="width: 100%; display: flex; flex-direction: column; flex: 1; margin-bottom: 16px;">
       <div class="mode-tabs" style="border-bottom: 1px solid var(--border);">

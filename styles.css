@@ -41,7 +41,7 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: 2rem 1rem 2rem 80px;
   font-family: 'Orbitron', monospace;
   color: var(--text);
   background-image: radial-gradient(rgba(220, 212, 216, 0.4) 1px, transparent 1px);
@@ -378,6 +378,25 @@ body {
   .wrap { flex-direction: column; }
   .col-left { width: 100%; }
   .col-right { width: 100%; }
+  
+  body {
+    padding: 1rem 1rem 80px 1rem;
+  }
+  
+  #sideDock {
+    width: 100% !important;
+    height: auto !important;
+    top: auto !important;
+    bottom: 0;
+    flex-direction: row !important;
+    padding: 8px 16px !important;
+    border-right: none !important;
+    border-top: 2px solid var(--border);
+    box-shadow: 0 -2px 0 var(--lavender) !important;
+  }
+  
+  .os-dock-title { display: none; }
+  .dock-divider { width: 2px !important; height: 32px !important; border-bottom: none !important; border-right: 2px dashed var(--border) !important; margin: 0 4px !important; }
 }
 
 /* Calendar Layout Styles */

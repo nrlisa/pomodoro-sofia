@@ -1,74 +1,86 @@
-### `README.md`
+# P0M0D0R0.EXE
 
-```markdown
-# P0M0D0R0.EXE ★
-
-A vibrant, vaporwave-infused retro Pomodoro application designed with a classic Y2K window aesthetic. It blends a hyper-stylized pixel interface with robust modern task management, academic tracking, and real-time cloud synchronization.
+> `SYSTEM STATUS: STABLE`
+> A minimalist, high-fidelity productivity workspace styled with a classic late-90s user interface. This engine integrates a custom tri-mode execution timer with multi-dimensional academic course tracking, task scheduling, and real-time database synchronization.
 
 ---
 
-## ★ KEY FEATURES
+## ✦ Key Architectural Modules
 
-### 💾 Core Engine & Auth
-* **★ AUTHENTICATION.EXE:** Secure user entry powered by Firebase Auth. It features intelligent auto-account generation (seamlessly signs in existing users or registers a fresh profile).
-* **★ P0M0D0R0.EXE:** A dynamic tri-mode timer shifting between **Focus** (25m), **Short Break** (5m), and **Long Break** (15m). Operates on an automated sequence routing that rings a sound alert and chains to the next logical block (e.g., auto-triggering a long break after 4 focus rounds).
-* **★ MINI-PLAYER (PiP):** Supports an independent, always-on-top Picture-in-Picture window. Uses an HTML5 Canvas stream to mirror live countdowns directly on top of your screen while you browse other tabs.
+### 💾 Core Synchronization and Session Engines
 
-### 🎧 Ambient Audio Matrix
-* **Synth Wave Alarm:** Custom synthesized square-wave frequencies triggered natively via the Web Audio API to bypass restrictive browser autoplay rules.
-* **Atmospheric Noise:** Immersive background options including **Heavy Rain**, **Ocean Waves**, and a dedicated **40Hz Gamma Focus Tone** with anti-pop audio fade curves.
+* **Automated Account Management**
+Secure endpoints powered by Firebase Authentication with automatic profile provisioning upon initial client handshake.
+* **Tri-Mode Execution Loop**
+Routes seamless state shifts between `Focus (25 min)`, `Short Break (5 min)`, and `Long Break (15 min)` intervals with automated sequence queuing.
+* **Canvas Media Bridge**
+Supports an isolated Picture-in-Picture display shell, leveraging a high-performance HTML5 Canvas streaming loop to frame dynamic time matrices transparently over separate browser tabs.
 
-### 📚 Unified Academic Hub
-* **Homework Manager (`★ SUBMISSIONS.EXE`):** Comprehensive assignment logs complete with due dates, customizable sub-task checklists, markdown text spaces for notes/links, and a confetti particle payoff upon completion.
-* **Exam Tracker (`★ EXAM_COUNTDOWN.EXE`):** Chronological test milestones with urgency status badges (`🚨 TODAY!!!`, `⚠️ DAYS LEFT`, or `PASSED`). Includes internal study-topic checkmarks to monitor overall mastery percentage.
-* **Task Manager (`★ TODO_LIST.EXE`):** Standard interactive daily responsibilities checklist with a quick-clean script (`🧹 CLEAN COMPLETED`) to sweep away checked entries.
+### 🎧 Ambient Signal Processing
 
-### 📊 System Operations & Stats
-* **Subject Folders (`★ SUBJECTS.CFG`):** Organize your tracking dashboard by semester (Sem 5-9) with specialized custom color-picking nodes that cascade instantly across your entire UI.
-* **Agenda Calendar (`★ CALENDAR.EXE`):** Interactive calendar matrix showing daily bullet nodes color-coded by subject alongside a chronological agenda sidebar for any selected date.
-* **Productivity Feed (`★ HISTORY.EXE`):** A rolling 7-day performance auditor summarizing active session history and charting focus minutes across a clean bar graph.
+* **Native Sound Synthesizer**
+Generates low-latency square-wave alert frequencies built natively using the Web Audio API to bypass restrictive browser media autoplay rules safely.
+* **Acoustic Signal Arrays**
+Provides layered background options including continuous parameterized audio loops of `Heavy Rain`, `Ocean Waves`, or a steady `40Hz Gamma` focus tone configured with fade-out click filters.
+
+### 📅 Academic Task Allocation
+
+* **Assignment Logs (`SUBMISSIONS.EXE`)**
+Features unified submission records mapping distinct deliverables, nested target sub-task checklists, markdown documentation areas, and a confetti particle payoff upon resolution.
+* **Milestone Monitoring (`EXAM_COUNTDOWN.EXE`)**
+Offers chronological exam tracking equipped with systemic status badges detailing deadline proximity such as `Today`, `Days Left`, or `Passed`.
+* **Daily Task Scheduler (`TODO_LIST.EXE`)**
+Integrates modular tracking checklists equipped with systematic garbage collection routines to purge finished sub-tasks instantly.
+
+### 📊 System Metadata and Controls
+
+* **Course Indexing (`SUBJECTS.CFG`)**
+Implements automated subject folder tracking across academic semesters 5 through 9 with custom hex color configurations that cascade dynamically across standard viewport borders.
+* **Matrix Calendar (`CALENDAR.EXE`)**
+Utilizes a reactive grid layout engine to map calendar blocks color-coded by subject alongside a chronological daily agenda sidebar panel.
+* **Productivity Ledger (`HISTORY.EXE`)**
+Drives a sliding 7-day data pipeline that aggregates completed focus intervals into a clean weekly performance bar graph.
 
 ---
 
-## ★ THE TECH STACK
+## ✦ Technical Architecture
 
-* **Frontend Architecture:** Vanilla JavaScript (ES6+ Modules), HTML5 Semantic Shell, CSS3 Flexbox/Grid Systems.
-* **Cloud Layer:** Google Firebase Ecosystem (Firebase Auth & Cloud Firestore real-time `onSnapshot` streaming pipelines).
-* **Local Redundancy:** Browser `localStorage` fallbacks to preserve configurations and state during network drops.
-* **Visual FX & Typography:** Canvas Confetti engine for achievement rewards; Google Fonts CDN monospaced families (`VT323` & `Orbitron`).
-* **Hosting Platform:** Vercel Cloud Platform for instant, serverless global distribution.
+* **Frontend Environment:** Vanilla `ECMAScript 6+` JavaScript Modules, clean HTML5 structure, and raw CSS3 Flexbox/Grid layout architectures.
+* **Cloud Infrastructure:** Fully integrated with the Google Firebase platform using `Firebase Auth` and `Cloud Firestore` real-time onSnapshot data streaming pipelines.
+* **Local Redundancy:** Programmed with browser `localStorage` mechanisms to manage configurations and app data during unexpected connection drops.
+* **Assets & Typography:** Rendered using the `Canvas Confetti` engine along with Google Fonts CDN monospaced typography profiles (`VT323` and `Orbitron`).
+* **Web Distribution:** Hosted on global cloud delivery architecture via the `Vercel` serverless platform.
 
 ---
 
-## ★ FILE ARCHITECTURE
+## ✦ Production Deployment Configuration
 
 ```text
-├── .github/workflows/static.yml   # Automated GitHub Pages static content deployment
-├── .vscode/launch.json            # Automated local browser debugging profile
-├── .gitignore                     # Secure protection masking local cloud credentials
-├── index.html                     # Core application layout panels and window shells
-├── script.js                      # Central app coordinator, state machine, and audio nodes
-├── tasks.js                       # Operational modules for todos, exams, homework, and modals
-├── calendar.js                    # Matrix engines generating the grid UI and daily agendas
-└── styles.css                     # Vaporwave color variables, keyframes, and scrollbars
+├── .vscode/launch.json            # Desktop browser debugging parameters
+├── .gitignore                     # Security filter preventing credential leaks
+├── index.html                     # Core interface layout and window panels
+├── script.js                      # Central state coordinator and audio engine
+├── tasks.js                       # Task operations, trackers, and dynamic modals
+├── calendar.js                    # Matrix engines generating data grid views
+└── styles.css                     # Custom variables, animations, and typography
 
 ```
 
 ---
 
-## ★ CONFIGURATION & LOCAL DEVELOPMENT
+## ✦ Development Integration
 
-### 1. Clone the Workspace
+### 1. Initialize Local Environment
 
 ```bash
-git clone [https://github.com/your-username/pomodoro-sofia.git](https://github.com/your-username/pomodoro-sofia.git)
+git clone https://github.com/your-username/pomodoro-sofia.git
 cd pomodoro-sofia
 
 ```
 
-### 2. Configure Environment Credentials
+### 2. Map Firebase Cloud Credentials
 
-Create a file named `firebase-config.js` right in the project root directory:
+To register your cloud database infrastructure safely, create a configuration file in the project root directory labeled `firebase-config.js`:
 
 ```javascript
 export const firebaseConfig = {
@@ -82,32 +94,8 @@ export const firebaseConfig = {
 
 ```
 
-*(Note: `firebase-config.js` is automatically blocked by `.gitignore` to prevent leaking private cloud tokens).*
+> **Security Note:** This specific file is blocked by default within the project `.gitignore` to prevent leaking private cloud tokens to public version control networks.
 
-### 3. Launch Locally
+### 3. Execution Protocols
 
-Run your favorite web daemon (like VS Code's **Live Server** extension) or use the pre-configured runtime profile inside `.vscode/launch.json`.
-
----
-
-## ★ PRODUCTION DEPLOYMENT
-
-### Option A: Automatic Git Sync (Recommended)
-
-1. Commit and push your workspace changes to your personal GitHub repository.
-2. Link your repository directly inside the **Vercel Dashboard**.
-3. Head to your **Vercel Project Settings > Environment Variables** to map configuration keys if utilizing custom pipelines.
-
-### Option B: Vercel CLI Upload
-
-For immediate cloud deployment straight from your local shell terminal:
-
-```bash
-npm install -g vercel   # Install tool globally
-vercel                  # Trigger interactive upload deployment
-
-```
-
-```
-
-```
+Serve the core directory using a local web server daemon, or run the pre-configured local browser debugging instance mapped within `.vscode/launch.json`.

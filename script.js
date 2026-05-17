@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, where, orderBy, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, where, orderBy, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 import { firebaseConfig } from './firebase-config.js';
@@ -28,6 +28,7 @@ try {
       currentUser = user;
       window.currentUser = user;
       useFirebase = true;
+      window.useFirebase = true;
       if (loginScreen) loginScreen.style.display = 'none';
       if (mainApp) mainApp.style.display = 'flex';
       
@@ -57,6 +58,7 @@ try {
     } else {
       currentUser = null;
       useFirebase = false;
+      window.useFirebase = false;
       if (loginScreen) loginScreen.style.display = 'block';
       if (mainApp) mainApp.style.display = 'none';
       
@@ -73,6 +75,7 @@ try {
 } catch (e) {
   console.error("Firebase init failed. Falling back to localStorage.", e);
   useFirebase = false;
+  window.useFirebase = false;
 }
 
 const signInBtn = document.getElementById('signInBtn');
@@ -582,6 +585,18 @@ function renderHistory() {
   items = items.filter(i => i.timestamp >= sevenDaysAgo);
   items.sort((a, b) => b.timestamp - a.timestamp);
 
+  let totalMins = 0;
+  let totalSess = 0;
+  items.forEach(item => {
+    if (item.mode === 'focus') {
+      totalMins += parseInt(item.durationMinutes, 10) || 0;
+      totalSess++;
+    }
+  });
+  
+  if(document.getElementById('statTotalFocus')) document.getElementById('statTotalFocus').textContent = totalMins;
+  if(document.getElementById('statTotalSessions')) document.getElementById('statTotalSessions').textContent = totalSess;
+
   renderChart(items);
 
   if (items.length === 0) {
@@ -744,6 +759,9 @@ async function togglePiP() {
 window.addEventListener('load', () => {
   updateStartBtnUI();
 
+  // Init Desktop Pet
+  if (window.selectPet) window.selectPet(currentPetIndex);
+
   // Auto-fill dates
   const todayStr = new Date().toISOString().split('T')[0];
   const hwDateInp = document.getElementById('hwDateInp');
@@ -764,6 +782,93 @@ window.addEventListener('load', () => {
   updateDots();
   renderHistory();
 });
+
+window.exportUserDataToFile = async () => {
+  if (!(await window.customConfirm("Are you sure you want to download a backup of your data?"))) return;
+
+  const data = {
+    exportTimestamp: Date.now(),
+    userAgent: navigator.userAgent,
+    userEmail: currentUser ? currentUser.email : 'offline',
+    todos: window.currentTodos || [],
+    exams: window.currentExams || [],
+    homework: window.currentHomework || [],
+    subjects: window.currentSubjects || [],
+    history: historyDocs.length ? historyDocs : (JSON.parse(localStorage.getItem('pomo_history')) || [])
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '_');
+  a.download = `POMO_BACKUP_${dateStr}.DAT`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.importUserDataFromFile = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!(await window.customConfirm("Are you sure you want to import data? This will merge with your current records."))) {
+    event.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.exportTimestamp) throw new Error("Invalid format");
+      
+      if (useFirebase && currentUser) {
+         const restoreCol = async (colName, items) => {
+             const existingSnap = await getDocs(collection(db, "users", currentUser.uid, colName));
+             const existingIds = new Set(existingSnap.docs.map(d => d.id));
+             let added = 0;
+             for (const item of items) {
+                 const id = item.id || Math.random().toString(36).substring(2, 15);
+                 if (!existingIds.has(id)) {
+                     const copy = { ...item };
+                     delete copy.id;
+                     await setDoc(doc(db, "users", currentUser.uid, colName, id), copy, { merge: true });
+                     added++;
+                 }
+             }
+             return added;
+         };
+         const tAdd = await restoreCol('todos', data.todos || []);
+         const eAdd = await restoreCol('exams', data.exams || []);
+         const hAdd = await restoreCol('homework', data.homework || []);
+         const sAdd = await restoreCol('subjects', data.subjects || []);
+         await window.customAlert(`★ CLOUD SYNC MERGE COMPLETE! ★<br>Added missing items: ${tAdd} Todos, ${eAdd} Exams, ${hAdd} HW, ${sAdd} Subjects.`);
+      } else {
+         const mergeLocal = (key, items) => {
+             const local = JSON.parse(localStorage.getItem(key)) || [];
+             const localIds = new Set(local.map(i => i.id));
+             let added = 0;
+             items.forEach(item => {
+                 if (!localIds.has(item.id)) { local.push(item); added++; }
+             });
+             localStorage.setItem(key, JSON.stringify(local));
+             return added;
+         };
+         const tAdd = mergeLocal('pomo_todos', data.todos || []);
+         const eAdd = mergeLocal('pomo_exams', data.exams || []);
+         const hAdd = mergeLocal('pomo_homework', data.homework || []);
+         const sAdd = mergeLocal('pomo_subjects', data.subjects || []);
+         mergeLocal('pomo_history', data.history || []);
+         await window.customAlert(`★ LOCAL DATA MERGED! ★<br>Added missing items: ${tAdd} Todos, ${eAdd} Exams, ${hAdd} HW, ${sAdd} Subjects.`);
+         window.location.reload(); 
+      }
+    } catch (err) {
+      await window.customAlert("Failed to read backup file: " + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+};
 
 function openPresets() {
   document.getElementById('modalsContainer').style.display = 'flex';
@@ -793,6 +898,7 @@ function closeModals() {
   const cm = document.getElementById('calendarModal');
   if (cm) cm.style.display = 'none';
   document.getElementById('subjectModal').style.display = 'none';
+  document.getElementById('profileModal').style.display = 'none';
   document.getElementById('subjectOverviewModal').style.display = 'none';
 }
 
@@ -835,6 +941,58 @@ window.switchTaskTab = (tab) => {
   });
 };
 
+window.customDialog = (opts) => {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('customDialogModal');
+    const overlay = document.getElementById('dialogOverlay');
+    const msgEl = document.getElementById('dialogMessage');
+    const inputEl = document.getElementById('dialogInput');
+    const okBtn = document.getElementById('dialogOkBtn');
+    const cancelBtn = document.getElementById('dialogCancelBtn');
+    const titleEl = document.getElementById('dialogTitle');
+
+    titleEl.textContent = opts.title || '★ SYSTEM_MESSAGE.EXE';
+    msgEl.innerHTML = opts.message || '';
+    
+    if (opts.type === 'prompt') {
+      inputEl.style.display = 'block';
+      inputEl.value = opts.default || '';
+      setTimeout(() => inputEl.focus(), 50);
+    } else {
+      inputEl.style.display = 'none';
+      inputEl.value = '';
+    }
+
+    if (opts.type === 'confirm' || opts.type === 'prompt') {
+      cancelBtn.style.display = 'block';
+    } else {
+      cancelBtn.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+        overlay.style.display = 'flex';
+
+    const cleanup = () => {
+      modal.style.display = 'none';
+      overlay.style.display = 'none';
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      inputEl.onkeydown = null;
+    };
+
+    okBtn.onclick = () => { cleanup(); resolve(opts.type === 'prompt' ? inputEl.value : true); };
+    cancelBtn.onclick = () => { cleanup(); resolve(opts.type === 'prompt' ? null : false); };
+    inputEl.onkeydown = (e) => {
+      if (e.key === 'Enter') okBtn.click();
+      if (e.key === 'Escape') cancelBtn.click();
+    };
+  });
+};
+
+window.customAlert = (msg, title) => window.customDialog({ type: 'alert', message: msg, title: title });
+window.customConfirm = (msg, title) => window.customDialog({ type: 'confirm', message: msg, title: title });
+window.customPrompt = (msg, def, title) => window.customDialog({ type: 'prompt', message: msg, default: def, title: title });
+
 // Expose globals for index.html inline event handlers
 window.togglePiP = togglePiP;
 window.setMode = setMode;
@@ -848,27 +1006,63 @@ window.openSubjects = openSubjects;
 window.closeModals = closeModals;
 window.applyPreset = applyPreset;
 
+let currentPetIndex = parseInt(localStorage.getItem('pomo_pet_idx')) || 1;
+window.selectPet = (idx) => {
+  currentPetIndex = idx;
+  localStorage.setItem('pomo_pet_idx', currentPetIndex);
+  
+  const petImg = document.getElementById('desktopPet');
+  if (petImg) petImg.src = `pet/pet ${currentPetIndex}.gif`;
+  
+  // Highlight selection in Profile Modal
+  for(let i=1; i<=4; i++) {
+    const el = document.getElementById('petSel'+i);
+    if(el) {
+      el.style.borderColor = (i === idx) ? 'var(--pink)' : 'var(--border)';
+      el.style.background = (i === idx) ? 'var(--lavender)' : 'var(--surface)';
+      el.style.boxShadow = (i === idx) ? 'inset 2px 2px 0 rgba(255,255,255,0.5)' : 'none';
+    }
+  }
+};
+
 window.handleSignOut = async () => {
-  if (auth && confirm("Are you sure you want to sign out?")) {
+  if (auth && (await window.customConfirm("Are you sure you want to sign out?"))) {
     await signOut(auth);
   }
 };
 
-window.editProfileName = async () => {
-  if (!currentUser) return;
+window.openProfile = async () => {
+  if (!currentUser) return window.customAlert("You must be signed in to view your profile.");
+  closeModals();
+  document.getElementById('modalsContainer').style.display = 'flex';
+  document.getElementById('profileModal').style.display = 'flex';
+  
+  document.getElementById('profileEmailDisp').textContent = currentUser.email.toUpperCase();
+  
   try {
     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-    const currentName = (userDoc.exists() && userDoc.data().displayName) ? userDoc.data().displayName : "";
-    
-    const newName = prompt(`Current name: ${currentName}\n\nEnter your new display name:`, currentName);
-    if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-      await setDoc(doc(db, "users", currentUser.uid), { displayName: newName.trim() }, { merge: true });
-      const statusEl = document.getElementById('statusTxt');
-      if (statusEl) statusEl.textContent = `WELCOME BACK, ${newName.trim().toUpperCase()}!`;
-      const greetEl = document.getElementById('mainGreeting');
-      if (greetEl) greetEl.textContent = `★ HELLO, ${newName.trim().toUpperCase()}! ★`;
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      document.getElementById('profileNameInp').value = data.displayName || '';
     }
   } catch (err) {
-    alert("Failed to update name: " + err.message);
+    console.log("Error fetching profile", err);
+  }
+};
+
+window.saveProfileName = async () => {
+  if (!currentUser) return;
+  const newName = document.getElementById('profileNameInp').value.trim();
+  if (!newName) return window.customAlert("Name cannot be empty.");
+  
+  try {
+    await setDoc(doc(db, "users", currentUser.uid), { displayName: newName }, { merge: true });
+    const statusEl = document.getElementById('statusTxt');
+    if (statusEl) statusEl.textContent = `WELCOME BACK, ${newName.toUpperCase()}!`;
+    const greetEl = document.getElementById('mainGreeting');
+    if (greetEl) greetEl.textContent = `★ HELLO, ${newName.toUpperCase()}! ★`;
+    await window.customAlert("Profile updated successfully!");
+  } catch (err) {
+    await window.customAlert("Failed to update name: " + err.message);
   }
 };

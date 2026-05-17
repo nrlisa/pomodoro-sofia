@@ -1,5 +1,26 @@
-import { doc, updateDoc, deleteDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, updateDoc, deleteDoc, addDoc, collection, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { db, currentUser } from './script.js';
+
+export async function executeMutation(colName, op, data, id = null) {
+  if (window.useFirebase && window.currentUser) {
+    if (op === 'add') await addDoc(collection(db, "users", window.currentUser.uid, colName), data);
+    else if (op === 'update') await updateDoc(doc(db, "users", window.currentUser.uid, colName, id), data);
+    else if (op === 'delete') await deleteDoc(doc(db, "users", window.currentUser.uid, colName, id));
+    else if (op === 'set') await setDoc(doc(db, "users", window.currentUser.uid, colName, id), data, { merge: true });
+  } else {
+    const storageKey = `pomo_${colName}`;
+    let items = JSON.parse(localStorage.getItem(storageKey)) || [];
+    if (op === 'add') items.push({ id: Math.random().toString(36).substring(2, 15), ...data });
+    else if (op === 'update' || op === 'set') items = items.map(item => item.id === id ? { ...item, ...data } : item);
+    else if (op === 'delete') items = items.filter(item => item.id !== id);
+    localStorage.setItem(storageKey, JSON.stringify(items));
+    
+    if (colName === 'todos' && window.renderTodos) window.renderTodos(items);
+    if (colName === 'exams' && window.renderExams) window.renderExams(items);
+    if (colName === 'homework' && window.renderHomework) window.renderHomework(items);
+    if (colName === 'subjects' && window.renderSubjects) window.renderSubjects(items);
+  }
+}
 
 window.currentSubjects = [];
 
@@ -16,7 +37,7 @@ window.fireConfetti = () => {
 };
 
 // --- SUBJECTS OPERATIONS ---
-export function renderSubjects(subjects) {
+function renderSubjects(subjects) {
   window.currentSubjects = subjects;
   const list = document.getElementById('subjectList');
   if (list) {
@@ -81,9 +102,11 @@ export function renderSubjects(subjects) {
   // Auto-fill dropdowns
   const hwSel = document.getElementById('hwSubjectInp');
   const exSel = document.getElementById('examSubjectInp');
+  const todoSel = document.getElementById('todoSubjectInp');
   const options = `<option value="">(No Subject)</option>` + subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   if (hwSel) { const prev = hwSel.value; hwSel.innerHTML = options; hwSel.value = prev; }
   if (exSel) { const prev = exSel.value; exSel.innerHTML = options; exSel.value = prev; }
+  if (todoSel) { const prev = todoSel.value; todoSel.innerHTML = options; todoSel.value = prev; }
 
   // Auto-refresh tasks and calendar so color changes cascade instantly!
   if (window.currentExams) renderExams(window.currentExams);
@@ -92,26 +115,26 @@ export function renderSubjects(subjects) {
 }
 
 window.updateSubjectColor = async (id, newColor) => {
-  if (currentUser && newColor) {
-    await updateDoc(doc(db, "users", currentUser.uid, "subjects", id), { color: newColor });
+  if (newColor) {
+    await executeMutation("subjects", "update", { color: newColor }, id);
   }
 };
 
 window.editSubject = async (id, oldName, oldSem) => {
-  const newName = prompt("Edit Subject Name:", oldName);
-  if (!newName || !currentUser) return;
-  const newSem = prompt("Edit Semester (5-9):", oldSem);
+  const newName = await window.customPrompt("Edit Subject Name:", oldName);
+  if (newName === null || !newName) return;
+  const newSem = await window.customPrompt("Edit Semester (5-9):", oldSem);
   if (newSem === null) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "subjects", id), { name: newName.trim(), semester: newSem.trim() });
+  await executeMutation("subjects", "update", { name: newName.trim(), semester: newSem.trim() }, id);
 };
 
 document.getElementById('addSubjectBtn')?.addEventListener('click', async () => {
   const name = document.getElementById('subjNameInp').value.trim();
   const semester = document.getElementById('subjSemInp').value;
   const color = document.getElementById('subjColorInp').value;
-  if (!name || !semester || !currentUser) return alert("Please fill out the Subject Name and Semester!");
+  if (!name || !semester) return await window.customAlert("Please fill out the Subject Name and Semester!");
   
-  await addDoc(collection(db, "users", currentUser.uid, "subjects"), { name, semester, color });
+  await executeMutation("subjects", "add", { name, semester, color });
   document.getElementById('subjNameInp').value = "";
   document.getElementById('subjSemInp').value = "";
 });
@@ -155,8 +178,14 @@ window.renderSubjectOverview = () => {
 document.getElementById('addTodoBtn')?.addEventListener('click', async () => {
   const text = document.getElementById('todoInp').value.trim();
   const date = document.getElementById('todoDateInp').value;
-  if (!text || !currentUser) return;
-  await addDoc(collection(db, "users", currentUser.uid, "todos"), { text, date, done: false });
+  const subjId = document.getElementById('todoSubjectInp').value;
+  if (!text) return;
+  
+  const subj = window.currentSubjects.find(s => s.id === subjId);
+  const color = subj ? subj.color : 'var(--blue)';
+  const subjectName = subj ? subj.name : '';
+
+  await executeMutation("todos", "add", { text, date, color, subjectId: subjId, subjectName, done: false });
   document.getElementById('todoInp').value = "";
 });
 document.getElementById('todoInp')?.addEventListener('keydown', (e) => {
@@ -180,14 +209,21 @@ function renderTodos(todos) {
   
   list.innerHTML = todos.map(t => {
     const dateStr = t.date ? `<span style="font-size: 13px; color: var(--muted); margin-left: auto;">📅 ${t.date}</span>` : '';
+    const subj = window.currentSubjects.find(s => s.id === t.subjectId);
+    const color = subj ? subj.color : (t.color || 'var(--blue)');
+    const subjBadge = subj ? `<span style="font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: var(--lavender); color: var(--dark); margin-right: 8px;">📚 ${subj.name}</span>` : (t.subjectName ? `<span style="font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: var(--lavender); color: var(--dark); margin-right: 8px;">📚 ${t.subjectName}</span>` : '');
+    
     return `
-      <li class="todo-item ${t.done ? 'done' : ''}" style="margin-bottom: 10px; padding: 12px; border-left: 6px solid var(--blue); border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+      <li class="todo-item ${t.done ? 'done' : ''}" style="margin-bottom: 10px; padding: 12px; border-left: 6px solid ${color}; border-radius: 6px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
         <div style="display: flex; flex-direction: column; flex: 1; gap: 4px;">
           <span class="todo-txt" style="cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="toggleTodo('${t.id}', ${t.done})">
             <div class="todo-check" style="width: 20px; height: 20px; border-radius: 4px;">${t.done ? '✓' : ''}</div>
             <strong style="font-size: 17px;">${t.text.replace(/</g, '&lt;')}</strong>
           </span>
-          ${dateStr ? `<div style="padding-left: 30px;">${dateStr}</div>` : ''}
+          <div style="display: flex; align-items: center; padding-left: 30px;">
+            ${subjBadge}
+            ${dateStr}
+          </div>
         </div>
         <div style="display: flex; gap: 10px; margin-left: 12px;">
           <button onclick="editItem('todos', '${t.id}', '${t.text.replace(/'/g, "\\'")}')" style="background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; transition: all 0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)'" onmouseout="this.style.opacity='0.6'; this.style.transform='none'" title="Edit">✏️</button>
@@ -205,13 +241,13 @@ document.getElementById('addExamBtn')?.addEventListener('click', async () => {
   const name = document.getElementById('examNameInp').value.trim();
   const date = document.getElementById('examDateInp').value;
   const subjId = document.getElementById('examSubjectInp').value;
-  if (!name || !date || !currentUser) return;
+  if (!name || !date) return;
   
   const subj = window.currentSubjects.find(s => s.id === subjId);
   const color = subj ? subj.color : '#f2e1e8';
   const subjectName = subj ? subj.name : '';
 
-  await addDoc(collection(db, "users", currentUser.uid, "exams"), { name, date, color, subjectId: subjId, subjectName, topics: [] });
+  await executeMutation("exams", "add", { name, date, color, subjectId: subjId, subjectName, topics: [] });
   document.getElementById('examNameInp').value = "";
   document.getElementById('examDateInp').value = "";
 });
@@ -354,11 +390,11 @@ window.renderExamModal = () => {
 
 document.getElementById('addTopicBtn')?.addEventListener('click', async () => {
   const text = document.getElementById('topicInp').value.trim();
-  if (!text || !currentUser || !window.currentExamId) return;
+  if (!text || !window.currentExamId) return;
   const exam = window.currentExams.find(e => e.id === window.currentExamId);
   if (!exam) return;
   const newTopics = [...(exam.topics || []), { text, done: false }];
-  await updateDoc(doc(db, "users", currentUser.uid, "exams", window.currentExamId), { topics: newTopics });
+  await executeMutation("exams", "update", { topics: newTopics }, window.currentExamId);
   document.getElementById('topicInp').value = '';
 });
 document.getElementById('topicInp')?.addEventListener('keydown', (e) => {
@@ -366,68 +402,66 @@ document.getElementById('topicInp')?.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('examNotesInp')?.addEventListener('change', async (e) => {
-  if (!window.currentExamId || !currentUser) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "exams", window.currentExamId), { notes: e.target.value });
+  if (!window.currentExamId) return;
+  await executeMutation("exams", "update", { notes: e.target.value }, window.currentExamId);
 });
 
 window.toggleTopic = async (examId, topicIdx, currentStatus) => {
   const exam = window.currentExams.find(e => e.id === examId);
-  if(!exam || !currentUser) return;
+  if(!exam) return;
   const newTopics = [...(exam.topics || [])];
   newTopics[topicIdx].done = !currentStatus;
-  await updateDoc(doc(db, "users", currentUser.uid, "exams", examId), { topics: newTopics });
+  await executeMutation("exams", "update", { topics: newTopics }, examId);
 };
 
 window.deleteTopic = async (examId, topicIdx) => {
   const exam = window.currentExams.find(e => e.id === examId);
-  if(!exam || !currentUser || !confirm("Delete this study topic?")) return;
+  if(!exam || !(await window.customConfirm("Delete this study topic?"))) return;
   const newTopics = [...(exam.topics || [])];
   newTopics.splice(topicIdx, 1);
-  await updateDoc(doc(db, "users", currentUser.uid, "exams", examId), { topics: newTopics });
+  await executeMutation("exams", "update", { topics: newTopics }, examId);
 };
-
 window.toggleTodo = async (id, currentStatus) => {
-  if(!currentUser) return;
   if (!currentStatus && window.currentTodos) {
     const tempTodos = window.currentTodos.map(t => t.id === id ? { ...t, done: true } : t);
     if (tempTodos.length > 0 && tempTodos.every(t => t.done)) window.fireConfetti();
   }
-  await updateDoc(doc(db, "users", currentUser.uid, "todos", id), { done: !currentStatus });
+  await executeMutation("todos", "update", { done: !currentStatus }, id);
 };
 
 window.deleteItem = async (type, id) => {
-  if (currentUser && confirm("Delete this item?")) {
-    await deleteDoc(doc(db, "users", currentUser.uid, type, id));
+  if (await window.customConfirm("Delete this item?")) {
+    await executeMutation(type, "delete", null, id);
   }
 };
 
 window.editItem = async (type, id, oldText) => {
-  const newText = prompt(`Edit entry:`, oldText);
-  if (currentUser && newText && newText.trim() !== "") {
-    await updateDoc(doc(db, "users", currentUser.uid, type, id), { text: newText.trim() });
+  const newText = await window.customPrompt(`Edit entry:`, oldText);
+  if (newText && newText.trim() !== "") {
+    await executeMutation(type, "update", { text: newText.trim() }, id);
   }
 };
 
 window.clearCompletedTodos = async () => {
-  if (!currentUser || !window.currentTodos) return;
+  if (!window.currentTodos) return;
   const completed = window.currentTodos.filter(t => t.done);
   if (completed.length === 0) {
-    alert("No completed tasks to clear!");
+    await window.customAlert("No completed tasks to clear!");
     return;
   }
-  if (confirm(`Sweep away ${completed.length} completed task(s)?`)) {
+  if (await window.customConfirm(`Sweep away ${completed.length} completed task(s)?`)) {
     for (const task of completed) {
-      await deleteDoc(doc(db, "users", currentUser.uid, "todos", task.id));
+      await executeMutation("todos", "delete", null, task.id);
     }
   }
 };
 
 window.editExam = async (id, oldName, oldDate) => {
-  const newName = prompt("Edit Exam Name:", oldName);
-  if (!newName || !currentUser) return;
-  const newDate = prompt("Edit Exam Date (YYYY-MM-DD):", oldDate);
+  const newName = await window.customPrompt("Edit Exam Name:", oldName);
+  if (!newName) return;
+  const newDate = await window.customPrompt("Edit Exam Date (YYYY-MM-DD):", oldDate);
   if (!newDate) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "exams", id), { name: newName.trim(), date: newDate });
+  await executeMutation("exams", "update", { name: newName.trim(), date: newDate }, id);
 };
 
 // --- HOMEWORK TRACKER OPERATIONS ---
@@ -435,13 +469,13 @@ document.getElementById('addHwBtn')?.addEventListener('click', async () => {
   const name = document.getElementById('hwNameInp').value.trim();
   const date = document.getElementById('hwDateInp').value;
   const subjId = document.getElementById('hwSubjectInp').value;
-  if (!name || !date || !currentUser) return;
+  if (!name || !date) return;
   
   const subj = window.currentSubjects.find(s => s.id === subjId);
   const color = subj ? subj.color : '#e1eaf2';
   const subjectName = subj ? subj.name : '';
 
-  await addDoc(collection(db, "users", currentUser.uid, "homework"), { name, date, color, subjectId: subjId, subjectName, tasks: [], notes: '', submitted: false });
+  await executeMutation("homework", "add", { name, date, color, subjectId: subjId, subjectName, tasks: [], notes: '', submitted: false });
   document.getElementById('hwNameInp').value = "";
   document.getElementById('hwDateInp').value = "";
 });
@@ -589,10 +623,10 @@ window.renderHwModal = () => {
 
 document.getElementById('addHwTaskBtn')?.addEventListener('click', async () => {
   const text = document.getElementById('hwTaskInp').value.trim();
-  if (!text || !currentUser || !window.currentHwId) return;
+  if (!text || !window.currentHwId) return;
   const hw = window.currentHomework.find(h => h.id === window.currentHwId);
   const newTasks = [...(hw.tasks || []), { text, done: false }];
-  await updateDoc(doc(db, "users", currentUser.uid, "homework", window.currentHwId), { tasks: newTasks });
+  await executeMutation("homework", "update", { tasks: newTasks }, window.currentHwId);
   document.getElementById('hwTaskInp').value = '';
 });
 document.getElementById('hwTaskInp')?.addEventListener('keydown', (e) => {
@@ -600,39 +634,38 @@ document.getElementById('hwTaskInp')?.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('hwNotesInp')?.addEventListener('change', async (e) => {
-  if (!window.currentHwId || !currentUser) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "homework", window.currentHwId), { notes: e.target.value });
+  if (!window.currentHwId) return;
+  await executeMutation("homework", "update", { notes: e.target.value }, window.currentHwId);
 });
 
 window.toggleHwTask = async (hwId, taskIdx, currentStatus) => {
   const hw = window.currentHomework.find(h => h.id === hwId);
-  if(!hw || !currentUser) return;
+  if(!hw) return;
   const newTasks = [...(hw.tasks || [])];
   newTasks[taskIdx].done = !currentStatus;
   if (!currentStatus && newTasks.length > 0 && newTasks.every(t => t.done)) window.fireConfetti();
-  await updateDoc(doc(db, "users", currentUser.uid, "homework", hwId), { tasks: newTasks });
+  await executeMutation("homework", "update", { tasks: newTasks }, hwId);
 };
 
 window.toggleHwSubmit = async (hwId, currentStatus) => {
-  if (!currentUser) return;
   if (!currentStatus) window.fireConfetti();
-  await updateDoc(doc(db, "users", currentUser.uid, "homework", hwId), { submitted: !currentStatus });
+  await executeMutation("homework", "update", { submitted: !currentStatus }, hwId);
 };
 
 window.deleteHwTask = async (hwId, taskIdx) => {
   const hw = window.currentHomework.find(h => h.id === hwId);
-  if(!hw || !currentUser || !confirm("Delete this sub-task?")) return;
+  if(!hw || !(await window.customConfirm("Delete this sub-task?"))) return;
   const newTasks = [...(hw.tasks || [])];
   newTasks.splice(taskIdx, 1);
-  await updateDoc(doc(db, "users", currentUser.uid, "homework", hwId), { tasks: newTasks });
+  await executeMutation("homework", "update", { tasks: newTasks }, hwId);
 };
 
 window.editHw = async (id, oldName, oldDate) => {
-  const newName = prompt("Edit Assignment Name:", oldName);
-  if (!newName || !currentUser) return;
-  const newDate = prompt("Edit Due Date (YYYY-MM-DD):", oldDate);
+  const newName = await window.customPrompt("Edit Assignment Name:", oldName);
+  if (!newName) return;
+  const newDate = await window.customPrompt("Edit Due Date (YYYY-MM-DD):", oldDate);
   if (!newDate) return;
-  await updateDoc(doc(db, "users", currentUser.uid, "homework", id), { name: newName.trim(), date: newDate });
+  await executeMutation("homework", "update", { name: newName.trim(), date: newDate }, id);
 };
 
-export { renderTodos, renderExams, renderHomework };
+export { renderTodos, renderExams, renderHomework, renderSubjects };

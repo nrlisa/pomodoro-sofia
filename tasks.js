@@ -31,8 +31,27 @@ export async function executeMutation(colName, op, data, id = null) {
     if (colName === 'homework' && window.renderHomework) window.renderHomework(items);
     if (colName === 'subjects' && window.renderSubjects) window.renderSubjects(items);
     if (colName === 'schedule' && window.renderSchedule) window.renderSchedule(items);
+    if (colName === 'stickies' && window.renderStickies) window.renderStickies(items);
   }
 }
+
+window.getTaskProgress = (item, type) => {
+   const list = type === 'exam' ? (item.topics || []) : (item.tasks || []);
+   if (list.length === 0) return { total: 0, done: 0, allDone: false };
+   let total = 0; let done = 0;
+   list.forEach(t => {
+      if (t.subtasks && t.subtasks.length > 0) {
+         total += t.subtasks.length;
+         done += t.subtasks.filter(st => st.done).length;
+      } else {
+         total++;
+         if (t.done) done++;
+      }
+   });
+   return { total, done, allDone: total > 0 && total === done };
+};
+
+window.executeMutation = executeMutation;
 
 window.deleteItem = async (type, id) => {
   if (await window.customConfirm("Delete this item?")) {

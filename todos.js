@@ -1,6 +1,17 @@
 import { executeMutation } from './tasks.js';
 
 // --- TODO OPERATIONS ---
+window.clearCompletedTodos = async () => {
+  if (!window.currentTodos) return;
+  const completed = window.currentTodos.filter(t => t.done);
+  if (completed.length === 0) return await window.customAlert("No completed tasks found!");
+  if (await window.customConfirm(`Clean up ${completed.length} completed task(s)?`)) {
+    for (const t of completed) {
+      await executeMutation("todos", "delete", null, t.id);
+    }
+  }
+};
+
 document.getElementById('addTodoBtn')?.addEventListener('click', async () => {
   const text = document.getElementById('todoInp').value.trim();
   const date = document.getElementById('todoDateInp').value;
@@ -34,7 +45,13 @@ export function renderTodos(todos) {
     return;
   }
   
-  list.innerHTML = todos.map(t => {
+  const sortedTodos = [...todos].sort((a, b) => {
+    const da = a.date ? new Date(a.date).getTime() : Infinity;
+    const db = b.date ? new Date(b.date).getTime() : Infinity;
+    return da - db;
+  });
+
+  list.innerHTML = sortedTodos.map(t => {
     const dateStr = t.date ? `<span style="font-size: 13px; color: var(--muted); margin-left: auto;">📅 ${t.date}</span>` : '';
     const subj = window.currentSubjects ? window.currentSubjects.find(s => s.id === t.subjectId) : null;
     const color = subj ? subj.color : (t.color || 'var(--blue)');
@@ -50,7 +67,7 @@ export function renderTodos(todos) {
           <div style="display: flex; align-items: center; padding-left: 30px;">${subjBadge}${dateStr}</div>
         </div>
         <div style="display: flex; gap: 10px; margin-left: 12px;">
-          <button onclick="editItem('todos', '${t.id}', '${t.text.replace(/'/g, "\\'")}')" style="background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; transition: all 0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)'" onmouseout="this.style.opacity='0.6'; this.style.transform='none'" title="Edit">✏️</button>
+          <button onclick="window.editTodo('${t.id}', '${t.text.replace(/'/g, "\\'")}', '${t.date || ''}')" style="background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; transition: all 0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2)'" onmouseout="this.style.opacity='0.6'; this.style.transform='none'" title="Edit">✏️</button>
           <button onclick="deleteItem('todos', '${t.id}')" style="background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; transition: all 0.2s;" onmouseover="this.style.opacity='1'; this.style.transform='scale(1.2) rotate(90deg)'; this.style.color='#c04080'" onmouseout="this.style.opacity='0.6'; this.style.transform='none'; this.style.color='inherit'" title="Delete">✕</button>
         </div>
       </li>
@@ -62,6 +79,21 @@ export function renderTodos(todos) {
   if (atm && atm.style.display !== 'none' && window.renderAllTasks) window.renderAllTasks();
 }
 window.renderTodos = renderTodos;
+
+window.editTodo = async (id, oldText, oldDate) => {
+    const res = await window.customDialog({
+        type: 'multi-prompt',
+        title: 'Edit Task:',
+        inputs: [
+            { type: 'text', default: oldText, placeholder: 'Task Name...' },
+            { type: 'date', default: oldDate || '', title: 'Due Date' }
+        ]
+    });
+    if (!res) return;
+    const [newText, newDate] = res;
+    if (!newText.trim()) return;
+    await executeMutation("todos", "update", { text: newText.trim(), date: newDate }, id);
+};
 
 window.toggleTodo = async (id, currentStatus) => {
   if (!currentStatus && window.currentTodos) {

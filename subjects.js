@@ -18,15 +18,13 @@ export function renderSubjects(subjects) {
         let doneItems = 0;
         
         subjExams.forEach(e => {
-          const topics = e.topics || [];
-          totalItems += topics.length;
-          doneItems += topics.filter(t => t.done).length;
+          const p = window.getTaskProgress(e, 'exam');
+          totalItems += p.total; doneItems += p.done;
         });
         
         subjHw.forEach(h => {
-          const tasks = h.tasks || [];
-          totalItems += tasks.length;
-          doneItems += tasks.filter(t => t.done).length;
+          const p = window.getTaskProgress(h, 'hw');
+          totalItems += p.total; doneItems += p.done;
         });
 
         let progressHtml = '';
@@ -49,7 +47,10 @@ export function renderSubjects(subjects) {
               <strong style="font-size: 16px;">${s.name.replace(/</g, '&lt;')}</strong>
               <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
                 <span style="font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: var(--lavender); color: var(--dark);">SEM ${s.semester ? s.semester.replace(/</g, '&lt;') : '?'}</span>
-                <span style="font-size: 12px; color: var(--muted);">${subjExams.length} EXAMS • ${subjHw.length} HW</span>
+                <span style="font-size: 12px; color: var(--muted);">${subjExams.filter(e => {
+                  const exactTarget = new Date(e.time ? `${e.date}T${e.time}` : `${e.date}T23:59:59`);
+                  return exactTarget - new Date() >= 0 && !window.getTaskProgress(e, 'exam').allDone;
+                }).length} UPCOMING EXAMS • ${subjHw.filter(h => !h.submitted && !window.getTaskProgress(h, 'hw').allDone).length} ACTIVE HW</span>
               </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
@@ -86,10 +87,17 @@ window.updateSubjectColor = async (id, newColor) => {
 };
 
 window.editSubject = async (id, oldName, oldSem) => {
-  const newName = await window.customPrompt("Edit Subject Name:", oldName);
-  if (newName === null || !newName) return;
-  const newSem = await window.customPrompt("Edit Semester (5-9):", oldSem);
-  if (newSem === null) return;
+  const res = await window.customDialog({
+    type: 'multi-prompt',
+    title: 'Edit Subject',
+    inputs: [
+      { type: 'text', default: oldName, placeholder: 'Subject Name...' },
+      { type: 'text', default: oldSem, placeholder: 'Semester (e.g., 5-9)' }
+    ]
+  });
+  if (!res) return;
+  const [newName, newSem] = res;
+  if (!newName.trim()) return window.customAlert("Subject Name cannot be empty.");
   await executeMutation("subjects", "update", { name: newName.trim(), semester: newSem.trim() }, id);
 };
 

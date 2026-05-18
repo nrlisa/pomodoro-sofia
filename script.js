@@ -9,6 +9,7 @@ import { renderExams } from './exams.js';
 import { renderHomework } from './homework.js';
 import { renderSubjects } from './subjects.js';
 import { renderSchedule } from './schedule.js';
+import { executeMutation } from './tasks.js';
 import './calendar.js';
 import './dashboard.js';
 
@@ -72,6 +73,7 @@ try {
       syncData('homework', collection(db, "users", user.uid, "homework"), renderHomework);
       syncData('subjects', collection(db, "users", user.uid, "subjects"), renderSubjects);
       syncData('schedule', collection(db, "users", user.uid, "schedule"), renderSchedule);
+      syncData('stickies', collection(db, "users", user.uid, "stickies"), window.renderStickies);
       setupRealtimeHistory();
     } else {
       currentUser = null;
@@ -794,6 +796,184 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+let activeSticky = null;
+let resizingSticky = null;
+let dragStartX, dragStartY, initialX, initialY, initialW, initialH;
+
+window.addEventListener('mousemove', (e) => {
+    if (activeSticky) {
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        activeSticky.style.left = (initialX + dx) + 'px';
+        activeSticky.style.top = (initialY + dy) + 'px';
+    } else if (resizingSticky) {
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        const newW = Math.max(150, initialW + dx);
+        const newH = Math.max(100, initialH + dy);
+        resizingSticky.style.width = newW + 'px';
+        resizingSticky.style.height = newH + 'px';
+    }
+});
+
+window.addEventListener('mouseup', (e) => {
+    if (activeSticky) {
+        const id = activeSticky.id;
+        const newX = parseInt(activeSticky.style.left);
+        const newY = parseInt(activeSticky.style.top);
+        activeSticky.style.zIndex = '1000';
+        activeSticky = null;
+        executeMutation('stickies', 'update', { x: newX, y: newY }, id);
+    } else if (resizingSticky) {
+        const id = resizingSticky.id;
+        const newW = parseInt(resizingSticky.style.width);
+        const newH = parseInt(resizingSticky.style.height);
+        resizingSticky = null;
+        executeMutation('stickies', 'update', { width: newW, height: newH }, id);
+    }
+});
+
+window.currentStickies = [];
+window.renderStickies = (stickies) => {
+    window.currentStickies = stickies;
+    document.querySelectorAll('.sticky-note').forEach(el => el.remove());
+    
+    const container = document.getElementById('mainApp') || document.body;
+    
+    stickies.filter(s => s.pinned).forEach(sticky => {
+        const noteEl = document.createElement('div');
+        noteEl.className = 'sticky-note';
+        noteEl.id = sticky.id;
+        noteEl.style.position = 'absolute';
+        noteEl.style.left = (sticky.x || 100) + 'px';
+        noteEl.style.top = (sticky.y || 100) + 'px';
+        noteEl.style.width = (sticky.width || 200) + 'px';
+        if (sticky.height) {
+            noteEl.style.height = sticky.height + 'px';
+        } else {
+            noteEl.style.height = 'auto';
+            noteEl.style.minHeight = '100px';
+        }
+        noteEl.style.backgroundColor = sticky.color || '#fff7d1';
+        noteEl.style.boxShadow = '2px 4px 6px rgba(0,0,0,0.1)';
+        noteEl.style.padding = '20px 15px 15px 15px';
+        noteEl.style.boxSizing = 'border-box';
+        noteEl.style.display = 'flex';
+        noteEl.style.flexDirection = 'column';
+        noteEl.style.zIndex = '1000';
+        noteEl.style.cursor = 'move';
+        
+        const pin = document.createElement('div');
+        pin.style.position = 'absolute';
+        pin.style.top = '-10px';
+        pin.style.left = '50%';
+        pin.style.transform = 'translateX(-50%)';
+        pin.style.width = '20px';
+        pin.style.height = '20px';
+        pin.style.borderRadius = '50%';
+        pin.style.backgroundColor = '#ff6b6b';
+        pin.style.boxShadow = 'inset -2px -2px 4px rgba(0,0,0,0.3), 1px 2px 2px rgba(0,0,0,0.2)';
+        noteEl.appendChild(pin);
+
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '✕';
+        delBtn.style.position = 'absolute';
+        delBtn.style.top = '2px';
+        delBtn.style.right = '2px';
+        delBtn.style.background = 'none';
+        delBtn.style.border = 'none';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.fontSize = '12px';
+        delBtn.style.opacity = '0.5';
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            window.executeMutation('stickies', 'update', { pinned: false }, sticky.id);
+        };
+        noteEl.appendChild(delBtn);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.style.flex = '1';
+        contentDiv.style.width = '100%';
+        contentDiv.style.overflowY = 'auto';
+        contentDiv.style.fontFamily = "'VT323', monospace";
+        contentDiv.style.fontSize = '16px';
+        contentDiv.style.wordBreak = 'break-word';
+        contentDiv.innerHTML = parseNoteMarkdown(sticky.text || '');
+        noteEl.appendChild(contentDiv);
+
+        const ta = document.createElement('textarea');
+        ta.value = sticky.text || '';
+        ta.style.flex = '1';
+        ta.style.width = '100%';
+        ta.style.border = 'none';
+        ta.style.background = 'transparent';
+        ta.style.resize = 'none';
+        ta.style.fontFamily = "'VT323', monospace";
+        ta.style.fontSize = '16px';
+        ta.style.outline = 'none';
+        ta.style.cursor = 'text';
+        ta.style.display = 'none';
+        ta.onmousedown = (e) => e.stopPropagation(); 
+        ta.onchange = (e) => executeMutation('stickies', 'update', { text: e.target.value }, sticky.id);
+        ta.onblur = () => {
+            contentDiv.innerHTML = parseNoteMarkdown(ta.value);
+            contentDiv.style.display = 'block';
+            ta.style.display = 'none';
+            // Restore auto-height if it was not manually resized
+            const sticky = window.currentStickies.find(s => s.id === noteEl.id);
+            if (sticky && !sticky.height) {
+                noteEl.style.height = 'auto';
+            }
+        };
+        noteEl.appendChild(ta);
+
+        const resizeHandle = document.createElement('div');
+        resizeHandle.style.position = 'absolute';
+        resizeHandle.style.bottom = '0px';
+        resizeHandle.style.right = '0px';
+        resizeHandle.style.width = '15px';
+        resizeHandle.style.height = '15px';
+        resizeHandle.style.cursor = 'se-resize';
+        resizeHandle.style.borderBottom = '3px solid rgba(0,0,0,0.2)';
+        resizeHandle.style.borderRight = '3px solid rgba(0,0,0,0.2)';
+        resizeHandle.style.boxSizing = 'border-box';
+        resizeHandle.onmousedown = (e) => {
+            e.stopPropagation();
+            resizingSticky = noteEl;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            initialW = parseInt(noteEl.style.width);
+            initialH = parseInt(noteEl.style.height);
+        };
+        noteEl.appendChild(resizeHandle);
+
+        noteEl.ondblclick = (e) => {
+            if (e.target.tagName === 'TEXTAREA') return;
+            // Fix the height to prevent resizing during edit
+            noteEl.style.height = noteEl.offsetHeight + 'px';
+            contentDiv.style.display = 'none';
+            ta.style.display = 'block';
+            ta.focus();
+        };
+
+        noteEl.onmousedown = (e) => {
+            if (ta.style.display === 'block') return;
+            activeSticky = noteEl;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            initialX = parseInt(noteEl.style.left) || 0;
+            initialY = parseInt(noteEl.style.top) || 0;
+            noteEl.style.zIndex = '1001';
+        };
+
+        container.appendChild(noteEl);
+    });
+
+    if (document.getElementById('notesModal') && document.getElementById('notesModal').style.display !== 'none') {
+        renderNotesModal();
+    }
+};
+
 window.addEventListener('load', () => {
   updateStartBtnUI();
 
@@ -822,6 +1002,8 @@ window.addEventListener('load', () => {
   if (!window.useFirebase) {
     window.currentScheduleImage = localStorage.getItem('pomo_timetable_image');
     if (window.renderScheduleImage) window.renderScheduleImage();
+    const localStickies = JSON.parse(localStorage.getItem('pomo_stickies')) || [];
+    window.renderStickies(localStickies);
   }
 });
 
@@ -953,6 +1135,7 @@ function closeModals() {
   document.getElementById('subjectModal').style.display = 'none';
   document.getElementById('profileModal').style.display = 'none';
   document.getElementById('subjectOverviewModal').style.display = 'none';
+  document.getElementById('notesModal').style.display = 'none';
   const atm = document.getElementById('allTasksModal');
   if (atm) atm.style.display = 'none';
 }
@@ -1009,23 +1192,44 @@ window.customDialog = (opts) => {
     const overlay = document.getElementById('dialogOverlay');
     const msgEl = document.getElementById('dialogMessage');
     const inputEl = document.getElementById('dialogInput');
+    const multiContainer = document.getElementById('dialogMultiContainer');
     const okBtn = document.getElementById('dialogOkBtn');
     const cancelBtn = document.getElementById('dialogCancelBtn');
     const titleEl = document.getElementById('dialogTitle');
 
     titleEl.textContent = opts.title || '★ SYSTEM_MESSAGE.EXE';
+    msgEl.style.display = opts.message ? 'block' : 'none';
     msgEl.innerHTML = opts.message || '';
     
     if (opts.type === 'prompt') {
       inputEl.style.display = 'block';
+      if (multiContainer) multiContainer.style.display = 'none';
       inputEl.value = opts.default || '';
       setTimeout(() => inputEl.focus(), 50);
+    } else if (opts.type === 'multi-prompt') {
+      inputEl.style.display = 'none';
+      if (multiContainer) {
+        multiContainer.style.display = 'flex';
+        multiContainer.innerHTML = '';
+        opts.inputs.forEach((inp, i) => {
+          const el = document.createElement('input');
+          el.type = inp.type || 'text';
+          el.className = 'todo-inp';
+          el.placeholder = inp.placeholder || '';
+          el.value = inp.default || '';
+          el.id = 'multiPromptInp_' + i;
+          if (inp.title) el.title = inp.title;
+          multiContainer.appendChild(el);
+        });
+        setTimeout(() => document.getElementById('multiPromptInp_0')?.focus(), 50);
+      }
     } else {
       inputEl.style.display = 'none';
+      if (multiContainer) multiContainer.style.display = 'none';
       inputEl.value = '';
     }
 
-    if (opts.type === 'confirm' || opts.type === 'prompt') {
+    if (opts.type === 'confirm' || opts.type === 'prompt' || opts.type === 'multi-prompt') {
       cancelBtn.style.display = 'block';
     } else {
       cancelBtn.style.display = 'none';
@@ -1042,18 +1246,88 @@ window.customDialog = (opts) => {
       inputEl.onkeydown = null;
     };
 
-    okBtn.onclick = () => { cleanup(); resolve(opts.type === 'prompt' ? inputEl.value : true); };
-    cancelBtn.onclick = () => { cleanup(); resolve(opts.type === 'prompt' ? null : false); };
-    inputEl.onkeydown = (e) => {
+    okBtn.onclick = () => { 
+      cleanup(); 
+      if (opts.type === 'prompt') resolve(inputEl.value);
+      else if (opts.type === 'multi-prompt') resolve(opts.inputs.map((_, i) => document.getElementById('multiPromptInp_' + i).value));
+      else resolve(true); 
+    };
+    cancelBtn.onclick = () => { cleanup(); resolve(opts.type === 'prompt' || opts.type === 'multi-prompt' ? null : false); };
+    
+    const handleEnter = (e) => {
       if (e.key === 'Enter') okBtn.click();
       if (e.key === 'Escape') cancelBtn.click();
     };
+    inputEl.onkeydown = handleEnter;
+    if (multiContainer) {
+      multiContainer.childNodes.forEach(el => el.onkeydown = handleEnter);
+    }
   });
 };
 
 window.customAlert = (msg, title) => window.customDialog({ type: 'alert', message: msg, title: title });
 window.customConfirm = (msg, title) => window.customDialog({ type: 'confirm', message: msg, title: title });
 window.customPrompt = (msg, def, title) => window.customDialog({ type: 'prompt', message: msg, default: def, title: title });
+
+window.openNotes = () => {
+  closeModals();
+  document.getElementById('modalsContainer').style.display = 'flex';
+  document.getElementById('notesModal').style.display = 'flex';
+  renderNotesModal();
+};
+
+window.addNewNote = async () => {
+    const colors = ['#fff7d1', '#ffd1d1', '#d1ffd1', '#d1e8ff', '#e8d1ff'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    await window.executeMutation('stickies', 'add', { text: '', x: window.innerWidth / 2 - 100, y: window.innerHeight / 2 - 100, color, pinned: false, width: 200, height: null });
+};
+
+window.renderNotesModal = () => {
+    const container = document.getElementById('notesModalList');
+    if (!container) return;
+    const stickies = window.currentStickies || [];
+    if (stickies.length === 0) {
+        container.innerHTML = `<div class="todo-empty" style="padding: 10px; opacity: 0.8; grid-column: 1 / -1;">NO NOTES YET ★</div>`;
+        return;
+    }
+    const colorPalette = ['#fff7d1', '#ffd1d1', '#d1ffd1', '#d1e8ff', '#e8d1ff', '#fddfff'];
+
+    container.innerHTML = stickies.map(s => {
+        const isPinned = s.pinned || false;
+        return `
+          <div style="background: ${s.color || '#fff7d1'}; padding: 12px; border-radius: 6px; box-shadow: 2px 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; position: relative;">
+             <textarea id="note-text-${s.id}" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px';" onchange="window.executeMutation('stickies', 'update', { text: this.value }, '${s.id}')" style="width: 100%; min-height: 80px; height: auto; border: none; background: transparent; resize: none; font-family: 'VT323', monospace; font-size: 16px; outline: none; margin-bottom: 8px; overflow: hidden;" placeholder="Write a note...">${s.text || ''}</textarea>
+             <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+                ${colorPalette.map(c => `<div onclick="window.executeMutation('stickies', 'update', { color: '${c}' }, '${s.id}')" style="width: 18px; height: 18px; background: ${c}; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); box-shadow: ${s.color === c ? 'inset 0 0 0 2px rgba(0,0,0,0.5)' : 'none'};"></div>`).join('')}
+             </div>
+             <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 8px;">
+               <label style="font-size: 12px; font-family: 'VT323', monospace; display: flex; align-items: center; gap: 4px; cursor: pointer; color: rgba(0,0,0,0.7); font-weight: bold;">
+                  <input type="checkbox" ${isPinned ? 'checked' : ''} onchange="window.executeMutation('stickies', 'update', { pinned: this.checked }, '${s.id}')" style="accent-color: #ff6b6b; cursor: pointer;">
+                  PIN TO DESKTOP
+               </label>
+               <button onclick="deleteItem('stickies', '${s.id}')" style="background: none; border: none; color: #c04080; cursor: pointer; font-size: 12px; opacity: 0.7;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">✕</button>
+             </div>
+          </div>
+        `;
+    }).join('');
+    
+    setTimeout(() => {
+        container.querySelectorAll('textarea').forEach(ta => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }, 10);
+};
+
+window.parseNoteMarkdown = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/\*(.*?)\*/g, '<i>$1</i>')
+        .replace(/^- (.*$)/gm, '<li style="list-style-type: \'★ \'; padding-left: 5px; margin-left: 1em;">$1</li>');
+};
 
 // Expose globals for index.html inline event handlers
 window.togglePiP = togglePiP;
@@ -1067,6 +1341,8 @@ window.openAnalytics = openAnalytics;
 window.openSubjects = openSubjects;
 window.closeModals = closeModals;
 window.applyPreset = applyPreset;
+window.openNotes = openNotes;
+window.addNewNote = addNewNote;
 
 let currentPetIndex = parseInt(localStorage.getItem('pomo_pet_idx')) || 1;
 window.selectPet = async (idx, sync = true) => {

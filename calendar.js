@@ -52,17 +52,20 @@ window.renderCalendarGrid = () => {
     let dots = '';
     dayExams.forEach(e => {
       const s = (window.currentSubjects || []).find(sub => sub.id === e.subjectId);
-      const isPassed = e.date < todayStr;
+      const prog = window.getTaskProgress(e, 'exam');
+      const isPassed = e.date < todayStr || prog.allDone;
       if (isPassed) {
-        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted);" title="Passed Exam: ${e.name}"></div>`;
+        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted);" title="Completed Exam: ${e.name}"></div>`;
       } else {
         dots += `<div class="cal-dot" style="background: ${s ? s.color : (e.color || 'var(--pink)')};" title="Exam: ${e.name}"></div>`;
       }
     });
     dayHw.forEach(h => {
       const s = (window.currentSubjects || []).find(sub => sub.id === h.subjectId);
-      if (h.submitted) {
-        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted); border-radius: 2px;" title="Submitted: ${h.name}"></div>`;
+      const prog = window.getTaskProgress(h, 'hw');
+      const isSubmitted = h.submitted || prog.allDone;
+      if (isSubmitted) {
+        dots += `<div class="cal-dot" style="background: var(--bg); border: 1px solid var(--muted); border-radius: 2px;" title="Completed: ${h.name}"></div>`;
       } else {
         dots += `<div class="cal-dot" style="background: ${s ? s.color : (h.color || 'var(--blue)')}; border-radius: 2px;" title="HW: ${h.name}"></div>`;
       }
@@ -118,34 +121,43 @@ window.renderCalAgenda = () => {
   let html = '';
   exams.forEach(e => {
     const s = (window.currentSubjects || []).find(sub => sub.id === e.subjectId);
-    const isPassed = e.date < todayStr;
+    const prog = window.getTaskProgress(e, 'exam');
+    const isPassed = e.date < todayStr || prog.allDone;
+    const subjName = s ? s.name : (e.subjectName || '');
+    const subjText = subjName ? ` <span style="font-size: 11px; opacity: 0.8;">(${subjName})</span>` : '';
     html += `
       <li class="todo-item ${isPassed ? 'done' : ''}" onclick="openExamModal('${e.id}')" style="margin-bottom: 6px; border-left: 6px solid ${s ? s.color : (e.color || 'var(--pink)')}; background: var(--surface);">
-        <span class="todo-txt" style="display: flex; gap: 8px;">
+        <span class="todo-txt" style="display: flex; gap: 8px; flex-wrap: wrap;">
           <span style="font-size: 13px; color: #fff; background: ${isPassed ? 'var(--muted)' : '#c04080'}; padding: 2px 6px; border-radius: 4px; align-self: flex-start;">EXAM</span>
-          <strong style="${isPassed ? 'text-decoration: line-through; color: var(--muted);' : ''}">${e.name}</strong>
+          <strong style="${isPassed ? 'text-decoration: line-through; color: var(--muted);' : ''}">${e.name}${subjText}</strong>
         </span>
       </li>
     `;
   });
   homework.forEach(h => {
-    const isSubmitted = h.submitted || false;
+    const prog = window.getTaskProgress(h, 'hw');
+    const isSubmitted = h.submitted || prog.allDone;
     const s = (window.currentSubjects || []).find(sub => sub.id === h.subjectId);
+    const subjName = s ? s.name : (h.subjectName || '');
+    const subjText = subjName ? ` <span style="font-size: 11px; opacity: 0.8;">(${subjName})</span>` : '';
     html += `
       <li class="todo-item ${isSubmitted ? 'done' : ''}" onclick="openHwModal('${h.id}')" style="margin-bottom: 6px; border-left: 6px solid ${s ? s.color : (h.color || 'var(--blue)')}; background: var(--surface);">
-        <span class="todo-txt" style="display: flex; gap: 8px;">
+        <span class="todo-txt" style="display: flex; gap: 8px; flex-wrap: wrap;">
           <span style="font-size: 13px; color: #fff; background: ${isSubmitted ? 'var(--muted)' : '#5070b0'}; padding: 2px 6px; border-radius: 4px; align-self: flex-start;">HW</span>
-          <strong style="${isSubmitted ? 'text-decoration: line-through; color: var(--muted);' : ''}">${h.name}</strong>
+          <strong style="${isSubmitted ? 'text-decoration: line-through; color: var(--muted);' : ''}">${h.name}${subjText}</strong>
         </span>
       </li>
     `;
   });
   todos.forEach(t => {
+    const s = (window.currentSubjects || []).find(sub => sub.id === t.subjectId);
+    const subjName = s ? s.name : (t.subjectName || '');
+    const subjText = subjName ? ` <span style="font-size: 11px; opacity: 0.8;">(${subjName})</span>` : '';
     html += `
       <li class="todo-item ${t.done ? 'done' : ''}" style="margin-bottom: 6px; border-left: 6px solid var(--blue); background: var(--surface);">
-        <span class="todo-txt" style="display: flex; gap: 8px;">
+        <span class="todo-txt" style="display: flex; gap: 8px; flex-wrap: wrap;">
           <span style="font-size: 13px; color: var(--dark); background: ${t.done ? 'var(--muted)' : 'var(--mint)'}; padding: 2px 6px; border-radius: 4px; align-self: flex-start;">TODO</span>
-          <strong style="${t.done ? 'text-decoration: line-through; color: var(--muted);' : ''}">${t.text}</strong>
+          <strong style="${t.done ? 'text-decoration: line-through; color: var(--muted);' : ''}">${t.text}${subjText}</strong>
         </span>
       </li>
     `;

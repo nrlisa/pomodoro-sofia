@@ -501,6 +501,7 @@ export function renderSchedule(items) {
     const isEvent = i.category === 'event';
     const borderColor = isEvent ? '#f6ad55' : (subj ? subj.color : 'var(--mint)');
     const catBadge = isEvent ? `<span style="font-size: 10px; padding: 1px 4px; background: #feebc8; color: #c05621; border-radius: 4px; margin-right: 4px;">EVENT</span>` : '';
+    const subjBadge = subj ? `<span style="font-size: 11px; padding: 1px 4px; background: var(--lavender); color: var(--dark); border-radius: 4px; margin-right: 4px;">📚 ${subj.name}</span>` : '';
     if (i.room || i.mode || i.startDate || i.endDate) {
       let dateRangeStr = '';
       if (i.startDate && i.endDate) dateRangeStr = `${i.startDate} to ${i.endDate}`;
@@ -512,7 +513,7 @@ export function renderSchedule(items) {
     <li class="todo-item today-sched-item" data-time="${i.time}" style="cursor: default; border-left: 4px solid ${borderColor}; padding: 8px 12px; margin-bottom: 6px; align-items: stretch; transition: all 0.3s;">
       <div style="font-family: 'Orbitron', monospace; font-size: 13px; color: var(--dark); font-weight: bold; width: auto; min-width: 75px; display: flex; align-items: center; padding-right: 8px;">${window.formatTimeDisplay(i.time).replace(/\s?-\s?/g, '<br>')}</div>
       <div class="todo-txt" style="flex: 1; border-left: 2px dashed var(--border); padding-left: 12px; margin-left: 4px; display: flex; flex-direction: column; justify-content: center;">
-        <div style="font-weight: bold;">${catBadge}${i.title.replace(/</g, '&lt;')}${i.type ? ` <span style="font-weight: normal; font-size: 12px; color: var(--muted);">(${i.type.replace(/</g, '&lt;')})</span>` : ''}</div>
+        <div style="font-weight: bold;">${catBadge}${subjBadge}${i.title.replace(/</g, '&lt;')}${i.type ? ` <span style="font-weight: normal; font-size: 12px; color: var(--muted);">(${i.type.replace(/</g, '&lt;')})</span>` : ''}</div>
         ${extraHtml}
       </div>
     </li>`;

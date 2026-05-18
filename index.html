@@ -34,10 +34,11 @@
   <div id="sideDock" style="position: fixed; left: 0; top: 0; width: 64px; height: 100vh; background: var(--pink); border-right: 2px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 16px; gap: 12px; z-index: 9999; box-shadow: 2px 0 0 var(--lavender); overflow-y: auto;">
     <div class="os-dock-title" style="font-family: 'VT323', monospace; font-weight: bold; writing-mode: vertical-rl; transform: rotate(180deg); margin-bottom: 20px; color: var(--dark); letter-spacing: 2px;">★ OS_DOCK.EXE</div>
     
-    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Stats & History" onclick="openAnalytics()">📊<span style="font-size: 10px; font-weight: bold;">STATS</span></button>
-    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Manage Subjects" onclick="openSubjects()">📚<span style="font-size: 10px; font-weight: bold;">SUBJECTS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="All Tasks Overview" onclick="openAllTasks()">📋<span style="font-size: 10px; font-weight: bold;">TASKS</span></button>
+    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Manage Subjects" onclick="openSubjects()">📚<span style="font-size: 10px; font-weight: bold;">SUBJECTS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Weekly Timetable" onclick="openSchedule()">📅<span style="font-size: 10px; font-weight: bold;">SCHED</span></button>
+    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Sticky Notes" onclick="openNotes()">🗒️<span style="font-size: 10px; font-weight: bold;">NOTES</span></button>
+    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Stats & History" onclick="openAnalytics()">📊<span style="font-size: 10px; font-weight: bold;">STATS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="View Profile" onclick="openProfile()">👤<span style="font-size: 10px; font-weight: bold;">PROFILE</span></button>
     
     <div class="dock-divider" style="width: 40px; border-bottom: 2px dashed var(--border); margin: 4px 0;"></div>
@@ -205,6 +206,7 @@
           <select id="hwSubjectInp" class="todo-inp" style="width: 120px; padding: 6px; font-size: 14px; flex-shrink: 0;"><option value="">(No Subject)</option></select>
           <input class="todo-inp" type="text" id="hwNameInp" placeholder="Assignment Name..." style="flex: 2;">
           <input class="todo-inp" type="date" id="hwDateInp" style="flex: 1; padding: 4px;">
+          <input class="todo-inp" type="time" id="hwTimeInp" style="flex: 1; padding: 4px;" title="Optional Due Time">
           <button class="add-btn" id="addHwBtn" style="padding: 2px 8px; background: var(--blue); box-shadow: none;">ADD</button>
         </div>
         <div id="hwSummaryBoard" style="display: flex; gap: 6px; margin-bottom: 12px;">
@@ -233,6 +235,7 @@
             <option value="ongoing">SHOW: ONGOING</option>
             <option value="not_started">SHOW: NOT STARTED</option>
             <option value="complete">SHOW: COMPLETE</option>
+            <option value="sort_nearest">SORT: NEAREST DUE</option>
           </select>
         </div>
         <ul id="hwList" class="todo-list" style="list-style: none; padding: 0; margin: 0; flex: 1;"></ul>
@@ -244,6 +247,7 @@
           <select id="examSubjectInp" class="todo-inp" style="width: 120px; padding: 6px; font-size: 14px; flex-shrink: 0;"><option value="">(No Subject)</option></select>
           <input class="todo-inp" type="text" id="examNameInp" placeholder="Exam Name..." style="flex: 2;">
           <input class="todo-inp" type="date" id="examDateInp" style="flex: 1; padding: 4px;">
+          <input class="todo-inp" type="time" id="examTimeInp" style="flex: 1; padding: 4px;" title="Optional Exam Time">
           <button class="add-btn" id="addExamBtn" style="padding: 2px 8px; background: var(--pink); box-shadow: none;">ADD</button>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
@@ -252,6 +256,7 @@
             <option value="all">SHOW: ALL</option>
             <option value="upcoming" selected>SHOW: UPCOMING</option>
             <option value="passed">SHOW: PAST HISTORY</option>
+            <option value="sort_nearest">SORT: NEAREST DUE</option>
           </select>
         </div>
         <ul id="examList" class="todo-list" style="list-style: none; padding: 0; margin: 0; flex: 1;"></ul>
@@ -270,6 +275,7 @@
           <button class="btn" style="width: auto; padding: 4px 8px; font-size: 13px; box-shadow: none;" onclick="clearCompletedTodos()">🧹 CLEAN COMPLETED</button>
         </div>
       </div>
+
       </div>
     </div>
 
@@ -302,6 +308,23 @@
 <!-- Modals Container -->
 <div id="modalsContainer" style="display: none; position: fixed; inset: 0; background: rgba(42, 26, 62, 0.4); backdrop-filter: blur(3px); align-items: center; justify-content: center; z-index: 1000;">  
 
+  <!-- Notes Modal -->
+  <div id="notesModal" class="panel" style="display: none; width: 800px; max-width: 95vw; max-height: 90vh; flex-direction: column;">
+    <div class="win-bar" style="background: #f6ad55;">
+      <span class="win-title">★ NOTES_BOARD.EXE</span>
+      <div class="win-btns"><button class="wbtn" onclick="closeModals()">×</button></div>
+    </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed var(--border); padding-bottom: 8px;">
+          <div class="custom-title" style="margin-bottom: 0; color: #f6ad55;">✦ MY STICKY NOTES</div>
+          <button class="add-btn" onclick="addNewNote()" style="padding: 2px 8px; background: #f6ad55; box-shadow: none;">➕ NEW NOTE</button>
+      </div>
+      <div style="font-family: 'VT323', monospace; font-size: 14px; color: var(--muted); margin-bottom: 12px; text-align: center; background: var(--surface); padding: 4px; border-radius: 4px;">Use **bold**, *italic*, and - bullet points for formatting. Double-click pinned notes to edit.</div>
+      <div id="notesModalList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; overflow-y: auto; flex: 1; align-content: start;">
+      </div>
+    </div>
+  </div>
+
   <!-- Exam Details / Study Topics Modal -->
   <div id="examModal" class="panel" style="display: none; width: 600px; max-width: 95vw; max-height: 90vh; flex-direction: column;">
     <div class="win-bar" style="background: var(--blue);">
@@ -312,14 +335,15 @@
     </div>
     <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
       <div class="custom-title">✦ STUDY TOPICS CHECKLIST</div>
-      <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-        <input class="todo-inp" type="text" id="topicInp" placeholder="Add a topic to study..." style="flex: 1;">
+      <div style="display: flex; gap: 6px; margin-bottom: 12px; align-items: center;">
+        <input class="todo-inp" type="text" id="topicInp" placeholder="Add a topic to study..." style="flex: 2;">
+        <input class="todo-inp" type="date" id="topicDateInp" style="flex: 1; padding: 4px;" title="Optional due date">
         <button class="add-btn" id="addTopicBtn" style="padding: 2px 8px; background: var(--blue); box-shadow: 2px 2px 0 #7090d0;">ADD</button>
       </div>
       <ul id="topicList" class="todo-list" style="list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto; padding-right: 4px;"></ul>
       
       <div class="custom-title" style="margin-top: 20px;">✦ EXAM NOTES</div>
-      <textarea id="examNotesInp" class="todo-inp" style="min-height: 250px; resize: vertical; font-size: 16px; width: 100%;" placeholder="Type your notes here... (Auto-saves on click away)"></textarea>
+      <textarea id="examNotesInp" class="todo-inp" style="min-height: 100px; resize: vertical; font-size: 16px; width: 100%;" placeholder="Type your notes here... (Auto-saves on click away)"></textarea>
     </div>
   </div>
 
@@ -333,14 +357,15 @@
     </div>
     <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
       <div class="custom-title">✦ ASSIGNMENT SUB-TASKS</div>
-      <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-        <input class="todo-inp" type="text" id="hwTaskInp" placeholder="Add a step to finish this..." style="flex: 1;">
+      <div style="display: flex; gap: 6px; margin-bottom: 12px; align-items: center;">
+        <input class="todo-inp" type="text" id="hwTaskInp" placeholder="Add a step to finish this..." style="flex: 2;">
+        <input class="todo-inp" type="date" id="hwTaskDateInp" style="flex: 1; padding: 4px;" title="Optional due date">
         <button class="add-btn" id="addHwTaskBtn" style="padding: 2px 8px; background: var(--blue); box-shadow: 2px 2px 0 #7090d0;">ADD</button>
       </div>
       <ul id="hwTaskList" class="todo-list" style="list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto; padding-right: 4px;"></ul>
       
       <div class="custom-title" style="margin-top: 20px;">✦ ASSIGNMENT NOTES & LINKS</div>
-      <textarea id="hwNotesInp" class="todo-inp" style="min-height: 250px; resize: vertical; font-size: 16px; width: 100%;" placeholder="Paste links, requirements, or notes here..."></textarea>
+      <textarea id="hwNotesInp" class="todo-inp" style="min-height: 100px; resize: vertical; font-size: 16px; width: 100%;" placeholder="Paste links, requirements, or notes here..."></textarea>
     </div>
   </div>
 
@@ -607,6 +632,7 @@
     <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--surface);">
       <div id="dialogMessage" style="font-family: 'VT323', monospace; font-size: 18px; color: var(--text); text-align: center; line-height: 1.4;">Message</div>
       <input type="text" id="dialogInput" class="todo-inp" style="display: none; width: 100%; text-align: center; font-size: 20px;">
+      <div id="dialogMultiContainer" style="display: none; flex-direction: column; gap: 8px; width: 100%;"></div>
       <div style="display: flex; gap: 10px; justify-content: center; margin-top: 8px;" id="dialogBtns">
         <button class="btn" id="dialogCancelBtn" style="background: var(--bg); color: var(--muted); display: none;">CANCEL</button>
         <button class="btn" id="dialogOkBtn" style="background: var(--mint); color: var(--dark); font-weight: bold; border-color: #a0d8c0;">OK</button>

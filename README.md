@@ -23,7 +23,12 @@ Generates low-latency square-wave alert frequencies built natively using the Web
 * **Acoustic Signal Arrays**
 Provides layered background options including continuous parameterized audio loops of `Heavy Rain`, `Ocean Waves`, or a steady `40Hz Gamma` focus tone configured with fade-out click filters.
 
-### 📅 Academic Task Allocation
+### 📝 Personalization and Notes
+
+* **Desktop Sticky Notes**
+  Supports free-form, resizable, and color-coded sticky notes that can be pinned to the main workspace for quick reminders. Notes support basic markdown and are synchronized across devices.
+
+###  Academic Task Allocation
 
 * **Assignment Logs (`SUBMISSIONS.EXE`)**
 Features unified submission records mapping distinct deliverables, nested target sub-task checklists, markdown documentation areas, and a confetti particle payoff upon resolution.
@@ -63,7 +68,7 @@ Drives a sliding 7-day data pipeline that aggregates completed focus intervals i
 ├── .vscode/launch.json            # Desktop browser debugging parameters
 ├── .gitignore                     # Security filter preventing credential leaks
 ├── index.html                     # Core interface layout and window panels
-├── script.js                      # Central state coordinator and audio engine
+├── script.js                      # Central state coordinator, audio engine, and sticky notes
 ├── tasks.js                       # Shared database mutation and utility engine
 ├── dashboard.js                   # Master overview analytics and task aggregation
 ├── schedule.js                    # Timetable engine, time parsing, and JSON imports

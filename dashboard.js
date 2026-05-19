@@ -20,6 +20,7 @@ window.renderAllTasks = () => {
   const exams = [...(window.currentExams || [])].sort(sortByDate);
   const hw = [...(window.currentHomework || [])].sort(sortByDate);
   const todos = [...(window.currentTodos || [])].sort(sortByDate);
+  const resources = window.currentResources || [];
 
   let examUpcoming = 0;
   let hwNotStarted = 0; let hwOngoing = 0; let hwComplete = 0; let hwOverdue = 0;
@@ -50,6 +51,13 @@ window.renderAllTasks = () => {
     const isCompleted = isPassed || prog.allDone;
     
     if (!isCompleted) examUpcoming++;
+  });
+
+  let resTodo = 0; let resProg = 0; let resDone = 0;
+  resources.forEach(r => {
+      if (r.status === 'Done') resDone++;
+      else if (r.status === 'In Progress') resProg++;
+      else resTodo++;
   });
 
   if (document.getElementById('mastExamUpcoming')) document.getElementById('mastExamUpcoming').textContent = examUpcoming;
@@ -178,5 +186,29 @@ window.renderAllTasks = () => {
       </div>`;
     }).join('');
   }
+
+  if (resources.length > 0) {
+    html += `<div class="custom-title" style="margin-top: 16px; color: var(--pink);">✦ ACTIVE RESOURCES</div>`;
+    const activeRes = resources.filter(r => r.status !== 'Done');
+    if (activeRes.length === 0) {
+        html += `<div class="todo-empty" style="padding: 10px;">ALL RESOURCES COMPLETED ★</div>`;
+    } else {
+        html += activeRes.map(r => {
+          const typeIcons = { 'Video': '📹', 'Article': '📄', 'Course': '📚', 'Docs': '📖', 'Repo': '💻', 'Tool': '🔧' };
+          const icon = typeIcons[r.type] || '🔗';
+          const total = r.checklist ? r.checklist.length : 0;
+          const done = r.checklist ? r.checklist.filter(c => c.done).length : 0;
+          const badgeHtml = `<span style="font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: var(--pink); color: var(--dark); border: 1px solid var(--dark); margin-right: 8px;">${r.status.toUpperCase()}</span>`;
+          
+          return `<div class="todo-item" style="cursor: pointer; border-left: 4px solid var(--pink);" onclick="openResources()">
+            <span class="todo-txt" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+              <strong style="font-size: 18px; font-weight: normal; flex: 1; display: flex; align-items: center;">${badgeHtml}${icon} ${r.title.replace(/</g, '&lt;')}</strong>
+              <span style="font-size: 14px; color: var(--muted); font-weight: normal;">${done}/${total} Steps</span>
+            </span>
+          </div>`;
+        }).join('');
+    }
+  }
+
   container.innerHTML = html;
 };

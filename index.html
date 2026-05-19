@@ -38,6 +38,7 @@
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Manage Subjects" onclick="openSubjects()">📚<span style="font-size: 10px; font-weight: bold;">SUBJECTS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Weekly Timetable" onclick="openSchedule()">📅<span style="font-size: 10px; font-weight: bold;">SCHED</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Sticky Notes" onclick="openNotes()">🗒️<span style="font-size: 10px; font-weight: bold;">NOTES</span></button>
+    <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Learning Resources" onclick="openResources()">🔗<span style="font-size: 10px; font-weight: bold;">EXTRAS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="Stats & History" onclick="openAnalytics()">📊<span style="font-size: 10px; font-weight: bold;">STATS</span></button>
     <button class="wbtn" style="width: 48px; height: 48px; flex-shrink: 0; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;" title="View Profile" onclick="openProfile()">👤<span style="font-size: 10px; font-weight: bold;">PROFILE</span></button>
     
@@ -616,6 +617,70 @@
       <div id="analyticsHistoryList" style="display: flex; flex-direction: column; gap: 8px;">
         <!-- Filled by JS -->
       </div>
+    </div>
+  </div>
+
+  <!-- Resources Modal -->
+  <div id="resourcesModal" class="panel" style="display: none; width: 850px; max-width: 95vw; max-height: 90vh; flex-direction: column;">
+    <div class="win-bar" style="background: var(--mint);">
+      <span class="win-title">★ RESOURCES.EXE</span>
+      <div class="win-btns"><button class="wbtn" onclick="closeModals()">×</button></div>
+    </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
+        <button class="add-btn" onclick="openAddResourceModal()" style="padding: 4px 12px; background: var(--mint); box-shadow: none;">➕ NEW RESOURCE</button>
+        <button class="add-btn" onclick="addResourceSection()" style="padding: 4px 12px; background: var(--lavender); box-shadow: none;">📁 NEW SECTION</button>
+        <select id="resFilterTypeSel" class="todo-inp" style="width: auto; padding: 4px 8px; font-size: 14px;" onchange="window.applyResourceFilter()">
+          <option value="All">All Types</option>
+          <option value="Video">📹 Video</option>
+          <option value="Article">📄 Article</option>
+          <option value="Course">📚 Course</option>
+          <option value="Docs">📖 Docs</option>
+          <option value="Repo">💻 Repo</option>
+          <option value="Tool">🔧 Tool</option>
+        </select>
+        <select id="resFilterStatusSel" class="todo-inp" style="width: auto; padding: 4px 8px; font-size: 14px;" onchange="window.applyResourceFilter()">
+          <option value="All">All Statuses</option>
+          <option value="Todo">○ Todo</option>
+          <option value="In Progress">● In Progress</option>
+          <option value="Done">✓ Done</option>
+        </select>
+        <input type="text" id="resSearchInp" class="todo-inp" placeholder="Search..." style="padding: 4px 8px; font-size: 14px; flex: 1; min-width: 150px;" oninput="window.applyResourceFilter()">
+      </div>
+      <div style="display: flex; gap: 16px; flex: 1; overflow: hidden;">
+        <div style="width: 200px; display: flex; flex-direction: column; gap: 4px; border-right: 2px dashed var(--border); padding-right: 12px; overflow-y: auto;">
+            <div class="custom-title">✦ SECTIONS</div>
+            <ul id="resSectionList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px;"></ul>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding-right: 4px;">
+           <div id="resListContainer" style="display: flex; flex-direction: column; gap: 16px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Resource Modal (Nested) -->
+  <div id="editResourceModal" class="panel" style="display: none; position: absolute; z-index: 1002; width: 400px; left: 50%; top: 50%; transform: translate(-50%, -50%); flex-direction: column; box-shadow: 4px 4px 0 var(--lavender), 0 0 20px rgba(0,0,0,0.2);">
+    <div class="win-bar" style="background: var(--pink);">
+      <span class="win-title" id="editResourceTitle">★ ADD_RESOURCE.EXE</span>
+      <div class="win-btns"><button class="wbtn" onclick="document.getElementById('editResourceModal').style.display='none'">×</button></div>
+    </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px; background: var(--surface);">
+      <input type="text" id="resEditTitle" class="todo-inp" placeholder="Resource Title...">
+      <input type="url" id="resEditUrl" class="todo-inp" placeholder="https://..." onblur="window.autoDetectResType()">
+      <div style="display: flex; gap: 8px;">
+        <select id="resEditType" class="todo-inp" style="flex: 1; font-size: 14px;">
+          <option value="Article">📄 Article</option>
+          <option value="Video">📹 Video</option>
+          <option value="Course">📚 Course</option>
+          <option value="Docs">📖 Docs</option>
+          <option value="Repo">💻 Repo</option>
+          <option value="Tool">🔧 Tool</option>
+        </select>
+        <select id="resEditSection" class="todo-inp" style="flex: 1; font-size: 14px;"></select>
+      </div>
+      <input type="text" id="resEditTags" class="todo-inp" placeholder="Tags (comma separated)...">
+      <button class="add-btn" id="saveResourceBtn" style="width: 100%; background: var(--pink);">SAVE RESOURCE</button>
     </div>
   </div>
 </div>

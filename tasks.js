@@ -32,6 +32,8 @@ export async function executeMutation(colName, op, data, id = null) {
     if (colName === 'subjects' && window.renderSubjects) window.renderSubjects(items);
     if (colName === 'schedule' && window.renderSchedule) window.renderSchedule(items);
     if (colName === 'stickies' && window.renderStickies) window.renderStickies(items);
+    if (colName === 'resources' && window.renderResources) window.renderResources(items);
+    if (colName === 'res_sections' && window.renderResSections) window.renderResSections(items);
   }
 }
 

@@ -12,6 +12,7 @@ import { renderSchedule } from './schedule.js';
 import { executeMutation } from './tasks.js';
 import './calendar.js';
 import './dashboard.js';
+import { renderResources, renderResSections } from './resources.js';
 
 export let app, auth, db;
 export let currentUser = null;
@@ -74,6 +75,8 @@ try {
       syncData('subjects', collection(db, "users", user.uid, "subjects"), renderSubjects);
       syncData('schedule', collection(db, "users", user.uid, "schedule"), renderSchedule);
       syncData('stickies', collection(db, "users", user.uid, "stickies"), window.renderStickies);
+      syncData('resources', collection(db, "users", user.uid, "resources"), renderResources);
+      syncData('res_sections', collection(db, "users", user.uid, "res_sections"), renderResSections);
       setupRealtimeHistory();
     } else {
       currentUser = null;
@@ -1138,6 +1141,10 @@ function closeModals() {
   document.getElementById('notesModal').style.display = 'none';
   const atm = document.getElementById('allTasksModal');
   if (atm) atm.style.display = 'none';
+  const rm = document.getElementById('resourcesModal');
+  if (rm) rm.style.display = 'none';
+  const erm = document.getElementById('editResourceModal');
+  if (erm) erm.style.display = 'none';
 }
 
 window.togglePanel = (id) => {
@@ -1324,6 +1331,7 @@ window.parseNoteMarkdown = (text) => {
     return text
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
+        .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" onmousedown="event.stopPropagation()" style="color: #c04080; text-decoration: underline; cursor: pointer;">$1</a>')
         .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
         .replace(/\*(.*?)\*/g, '<i>$1</i>')
         .replace(/^- (.*$)/gm, '<li style="list-style-type: \'★ \'; padding-left: 5px; margin-left: 1em;">$1</li>');
